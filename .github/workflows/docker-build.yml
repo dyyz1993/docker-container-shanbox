@@ -75,7 +75,7 @@ jobs:
           # ==============================================
           # Setup
           # ==============================================
-          mkdir -p /tmp/sb-data /tmp/sb-cfg /tmp/sb-ssl
+          mkdir -p /tmp/sb-data /tmp/sb-cfg
           echo "persist-before-restart" > /tmp/sb-data/before.txt
           echo "shared-data.txt" > /tmp/sb-data/shared.txt
 
@@ -84,8 +84,7 @@ jobs:
             -e PUBLIC_IP="1.2.3.4" \
             -v /tmp/sb-data:/root/data \
             -v /tmp/sb-cfg:/etc/nginx/custom \
-            -v /tmp/sb-ssl:/etc/nginx/ssl \
-            -p 2222:22 -p 8443:443 -p 8080:80 \
+            -p 2222:22 -p 8080:80 \
             "$IMAGE"
           sleep 8
 
@@ -125,73 +124,73 @@ jobs:
           sleep 2
 
           # ==============================================
-          # CURL wrapper (self-signed cert → -k)
+          # CURL wrapper
           # ==============================================
-          KCURL="curl -sk"
+          KCURL="curl -s"
 
           # ==============================================
           # [1] public → 200
           # ==============================================
           echo "=== [1/12] public endpoint → expect 200 ==="
-          $KCURL -H "Host: web.example.com" https://localhost:8443/ | grep -q "web" \
+          $KCURL -H "Host: web.example.com" http://localhost:8080/ | grep -q "web" \
             && echo "PASS" || { echo "FAIL"; ((FAIL++)); }
 
           # ==============================================
           # [2] key missing → 401 JSON
           # ==============================================
           echo "=== [2/12] key auth: missing → expect 401 ==="
-          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: api.example.com" https://localhost:8443/)
-          BODY=$($KCURL -H "Host: api.example.com" https://localhost:8443/)
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: api.example.com" http://localhost:8080/)
+          BODY=$($KCURL -H "Host: api.example.com" http://localhost:8080/)
           echo "$BODY" | grep -q "unauthorized" && echo "PASS (401 + error JSON)" || { echo "FAIL ($CODE)"; ((FAIL++)); }
 
           # ==============================================
           # [3] key provided → 200
           # ==============================================
           echo "=== [3/12] key auth: provided → expect 200 ==="
-          $KCURL -H "Host: api.example.com" "https://localhost:8443/?key=mysecret" | grep -q "api" \
+          $KCURL -H "Host: api.example.com" "http://localhost:8080/?key=mysecret" | grep -q "api" \
             && echo "PASS" || { echo "FAIL"; ((FAIL++)); }
 
           # ==============================================
           # [4] key missing, HTML request → 302 redirect
           # ==============================================
           echo "=== [4/12] key auth: HTML → expect 302 ==="
-          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: api.example.com" -H "Accept: text/html" https://localhost:8443/)
-          LOC=$($KCURL -o /dev/null -w "%{redirect_url}" -H "Host: api.example.com" -H "Accept: text/html" https://localhost:8443/)
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: api.example.com" -H "Accept: text/html" http://localhost:8080/)
+          LOC=$($KCURL -o /dev/null -w "%{redirect_url}" -H "Host: api.example.com" -H "Accept: text/html" http://localhost:8080/)
           echo "$LOC" | grep -q "__auth__" && echo "PASS (302 → __auth__)" || { echo "FAIL ($CODE, loc=$LOC)"; ((FAIL++)); }
 
           # ==============================================
           # [5] header missing → 401
           # ==============================================
           echo "=== [5/12] header auth: missing → expect 401 ==="
-          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: xapi.example.com" https://localhost:8443/)
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: xapi.example.com" http://localhost:8080/)
           [ "$CODE" = "401" ] && echo "PASS ($CODE)" || { echo "FAIL ($CODE)"; ((FAIL++)); }
 
           # ==============================================
           # [6] header provided → 200
           # ==============================================
           echo "=== [6/12] header auth: provided → expect 200 ==="
-          $KCURL -H "Host: xapi.example.com" -H "X-Auth-Token: tok123" https://localhost:8443/ | grep -q "xapi" \
+          $KCURL -H "Host: xapi.example.com" -H "X-Auth-Token: tok123" http://localhost:8080/ | grep -q "xapi" \
             && echo "PASS" || { echo "FAIL"; ((FAIL++)); }
 
           # ==============================================
           # [7] private from localhost → 200 (bypass)
           # ==============================================
           echo "=== [7/12] private: localhost → expect 200 ==="
-          docker exec e2ebox curl -sk -H "Host: locked.example.com" https://127.0.0.1/ | grep -q "locked" \
+          docker exec e2ebox curl -s -H "Host: locked.example.com" http://127.0.0.1/ | grep -q "locked" \
             && echo "PASS (local bypass)" || { echo "FAIL"; ((FAIL++)); }
 
           # ==============================================
           # [8] private from external → blocked
           # ==============================================
           echo "=== [8/12] private: external → expect 401 ==="
-          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: locked.example.com" https://localhost:8443/)
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: locked.example.com" http://localhost:8080/)
           [ "$CODE" = "401" ] && echo "PASS ($CODE)" || { echo "FAIL ($CODE)"; ((FAIL++)); }
 
           # ==============================================
           # [9] Header route, HTML request → 302
           # ==============================================
           echo "=== [9/12] header+HTML → expect 302 ==="
-          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: xapi.example.com" -H "Accept: text/html" https://localhost:8443/)
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: xapi.example.com" -H "Accept: text/html" http://localhost:8080/)
           [ "$CODE" = "302" ] && echo "PASS ($CODE)" || { echo "FAIL ($CODE)"; ((FAIL++)); }
 
           # ==============================================
@@ -226,7 +225,7 @@ jobs:
           # [12] Routes survive restart + manage-route.sh
           # ==============================================
           echo "=== [12/12] routes after restart + manage script ==="
-          $KCURL -H "Host: web.example.com" https://localhost:8443/ | grep -q "web" \
+          $KCURL -H "Host: web.example.com" http://localhost:8080/ | grep -q "web" \
             && echo "PASS: routes survive restart" || { echo "FAIL: routes lost"; ((FAIL++)); }
 
           docker exec e2ebox bash /root/scripts/manage-route.sh list
@@ -236,7 +235,7 @@ jobs:
           # Cleanup
           # ==============================================
           docker stop e2ebox && docker rm e2ebox
-          rm -rf /tmp/sb-data /tmp/sb-cfg /tmp/sb-ssl
+          rm -rf /tmp/sb-data /tmp/sb-cfg
 
           echo ""
           echo "============================================"
