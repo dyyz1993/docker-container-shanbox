@@ -20,19 +20,7 @@ if [ ! -f /etc/ssh/ssh_host_ed25519_key ]; then
 fi
 
 # ==========================================
-# 2. SSL Certificate (self-signed fallback)
-# ==========================================
-if [ ! -f /etc/nginx/ssl/cert.pem ]; then
-    echo "[entrypoint] Generating self-signed SSL certificate..."
-    mkdir -p /etc/nginx/ssl
-    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout /etc/nginx/ssl/key.pem \
-        -out /etc/nginx/ssl/cert.pem \
-        -subj "/CN=*.${DOMAIN:-example.com}" 2>/dev/null
-fi
-
-# ==========================================
-# 3. Peer IP detection (PUBLIC_IP)
+# 2. Peer IP detection (PUBLIC_IP)
 # ==========================================
 if [ -n "$PUBLIC_IP" ]; then
     cat > /etc/nginx/conf.d/geo_peer.conf << NGINXEOF
@@ -50,14 +38,14 @@ NGINXEOF
 fi
 
 # ==========================================
-# 4. Nginx config generation
+# 3. Nginx config generation
 # ==========================================
 envsubst '${PUBLIC_IP} ${DOMAIN}' \
     < /etc/nginx/templates/server.conf.template \
     > /etc/nginx/conf.d/server.conf
 
 # ==========================================
-# 5. Routes config
+# 4. Routes config
 # ==========================================
 if [ -f /etc/nginx/custom/routes.conf ]; then
     cp /etc/nginx/custom/routes.conf /etc/nginx/routes.d/default.conf
@@ -74,12 +62,12 @@ NGINXEOF
 fi
 
 # ==========================================
-# 6. Ensure dirs
+# 5. Ensure dirs
 # ==========================================
 mkdir -p /root/scripts /root/data /var/log/supervisor
 
 # ==========================================
-# 7. Validate & Start
+# 6. Validate & Start
 # ==========================================
 echo "[entrypoint] Checking Nginx config..."
 nginx -t

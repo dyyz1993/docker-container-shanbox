@@ -24,7 +24,7 @@ RUN mkdir -p /var/run/sshd /root/.ssh \
     && sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 
 RUN rm -f /etc/nginx/sites-enabled/default \
-    && mkdir -p /usr/share/nginx/auth /etc/nginx/ssl /etc/nginx/routes.d /var/www
+    && mkdir -p /usr/share/nginx/auth /etc/nginx/routes.d /var/www
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -41,7 +41,7 @@ RUN chmod +x /root/scripts/*.sh
 
 WORKDIR /root
 
-EXPOSE 22 80 443
+EXPOSE 22 80
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/usr/bin/supervisord", "-n"]
