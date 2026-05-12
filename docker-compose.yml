@@ -1,19 +1,17 @@
 services:
   server:
-    build: .
+    image: ghcr.io/dyyz1993/docker-container-shanbox:latest
     container_name: shanbox
     restart: unless-stopped
     ports:
       - "2222:22"
-      - "80:80"
-      - "443:443"
+      - "9080:80"
     environment:
       - SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
       - PUBLIC_IP=${PUBLIC_IP}
       - DOMAIN=${DOMAIN:-example.com}
     volumes:
       - ./config:/etc/nginx/custom
-      - ./ssl:/etc/nginx/ssl
       - ./scripts:/root/scripts
       - ./data:/root/data
       - ./logs:/var/log
