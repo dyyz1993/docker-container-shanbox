@@ -4,7 +4,7 @@ NGINX_BIN="/usr/sbin/nginx"
 
 get_routes_raw() {
     awk '/^map \$host \$backend_port/,/^}/' "$ROUTES_FILE" | grep -E '^\s*~\^' | while read -r line; do
-        subdomain=$(echo "$line" | sed 's/.*~\^//;s/\\\.//;s/\..*//;s/;.*//' | tr -d ' ')
+        subdomain=$(echo "$line" | awk '{print $1}' | sed 's/~\^//;s/\\\.//;s/\.$//')
         port=$(echo "$line" | awk '{print $2}' | sed 's/;.*//')
         policy_line=$(awk '/^map \$host \$access_policy/,/^}/' "$ROUTES_FILE" | grep -F "~^${subdomain}")
         policy="public"
