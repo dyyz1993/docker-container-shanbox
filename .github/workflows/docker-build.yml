@@ -185,9 +185,7 @@ jobs:
           # ==============================================
           echo "=== [8/12] private: external → expect 401 ==="
           CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: locked.example.com" https://localhost:8443/)
-          echo "got HTTP $CODE"
-          # external docker bridge IP is 172.17.0.x → NOT in local CIDRs → should fail
-          # [ "$CODE" = "401" ] && echo "PASS" || { echo "FAIL (wanted 401)"; ((FAIL++)); }
+          [ "$CODE" = "401" ] && echo "PASS ($CODE)" || { echo "FAIL ($CODE)"; ((FAIL++)); }
 
           # ==============================================
           # [9] Header route, HTML request → 302
