@@ -6,12 +6,8 @@ server {
     error_page 498 = @need_auth;
 
     set $admin_deny 0;
-    if ($http_x_real_ip !~ ^(10\.|192\.168\.|127\.)) {
-        set $admin_deny 1;
-    }
-    if ($http_x_real_ip = "") {
-        set $admin_deny 0;
-    }
+    if ($http_x_real_ip !~ ^(10\.|192\.168\.|127\.)) { set $admin_deny 1; }
+    if ($http_x_real_ip = "") { set $admin_deny 0; }
 
     location /__admin__/ {
         if ($admin_deny = 1) { return 403; }
@@ -32,7 +28,6 @@ server {
 
     location / {
         set $auth_key_fail "0";
-
         if ($access_policy = "key")     { set $auth_key_fail "1"; }
         if ($access_policy = "public")  { set $auth_key_fail "0"; }
         if ($is_local = 1)              { set $auth_key_fail "0"; }
@@ -41,7 +36,6 @@ server {
         if ($arg_key != "")             { set $auth_key_fail "0"; }
 
         set $auth_header_fail "0";
-
         if ($access_policy = "header")  { set $auth_header_fail "1"; }
         if ($access_policy = "public")  { set $auth_header_fail "0"; }
         if ($is_local = 1)              { set $auth_header_fail "0"; }
@@ -50,7 +44,6 @@ server {
         if ($http_x_auth_token != "")   { set $auth_header_fail "0"; }
 
         set $auth_private_fail "0";
-
         if ($access_policy = "private") { set $auth_private_fail "1"; }
         if ($access_policy = "public")  { set $auth_private_fail "0"; }
         if ($is_local = 1)              { set $auth_private_fail "0"; }
@@ -63,20 +56,22 @@ server {
         if ($auth_private_fail = "1") { set $auth_fail "1"; }
 
         if ($auth_fail = "1") { return 498; }
-
         if ($backend_port = 0) { return 404; }
 
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-
         proxy_pass http://127.0.0.1:$backend_port;
     }
 
     location @need_auth {
+        set $ext_proto $scheme;
+        set $ext_port "";
+        if ($http_x_forwarded_proto) { set $ext_proto $http_x_forwarded_proto; }
+        if ($ext_proto = "https") { set $ext_port ":8443"; }
         if ($http_accept ~* "text/html") {
-            return 302 $scheme://$host/__auth__/?from=$scheme://$host$request_uri;
+            return 302 $ext_proto://$host$ext_port/__auth__/?from=$ext_proto://$host$ext_port$request_uri;
         }
         default_type application/json;
         return 401 '{"error":"unauthorized","message":"authentication required"}';
