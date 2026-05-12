@@ -5,10 +5,22 @@ server {
     client_max_body_size 1024M;
     error_page 498 = @need_auth;
 
+    location /__admin__/ {
+        alias /usr/share/nginx/admin/;
+        index index.html;
+    }
+
+    location /__api__/ {
+        proxy_pass http://127.0.0.1:9999/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /__auth__/ {
+        alias /usr/share/nginx/auth/;
+    }
+
     location / {
-        # --------------------------------------------------
-        # KEY auth check
-        # --------------------------------------------------
         set $auth_key_fail "0";
 
         if ($access_policy = "key")     { set $auth_key_fail "1"; }
@@ -17,9 +29,6 @@ server {
         if ($is_peer  = 1)              { set $auth_key_fail "0"; }
         if ($arg_key != "")             { set $auth_key_fail "0"; }
 
-        # --------------------------------------------------
-        # HEADER auth check
-        # --------------------------------------------------
         set $auth_header_fail "0";
 
         if ($access_policy = "header")  { set $auth_header_fail "1"; }
@@ -28,9 +37,6 @@ server {
         if ($is_peer  = 1)              { set $auth_header_fail "0"; }
         if ($http_x_auth_token != "")   { set $auth_header_fail "0"; }
 
-        # --------------------------------------------------
-        # PRIVATE auth check
-        # --------------------------------------------------
         set $auth_private_fail "0";
 
         if ($access_policy = "private") { set $auth_private_fail "1"; }
@@ -38,9 +44,6 @@ server {
         if ($is_local = 1)              { set $auth_private_fail "0"; }
         if ($is_peer  = 1)              { set $auth_private_fail "0"; }
 
-        # --------------------------------------------------
-        # Combined: any auth fails → 498
-        # --------------------------------------------------
         set $auth_fail "0";
         if ($auth_key_fail     = "1") { set $auth_fail "1"; }
         if ($auth_header_fail  = "1") { set $auth_fail "1"; }
@@ -48,9 +51,6 @@ server {
 
         if ($auth_fail = "1") { return 498; }
 
-        # --------------------------------------------------
-        # Route to backend
-        # --------------------------------------------------
         if ($backend_port = 0) { return 404; }
 
         proxy_set_header Host $host;
@@ -67,9 +67,5 @@ server {
         }
         default_type application/json;
         return 401 '{"error":"unauthorized","message":"authentication required"}';
-    }
-
-    location /__auth__/ {
-        alias /usr/share/nginx/auth/;
     }
 }

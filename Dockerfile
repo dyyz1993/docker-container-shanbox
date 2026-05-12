@@ -10,9 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     cron \
     ca-certificates \
-    openssl \
     gettext-base \
     netcat-openbsd \
+    socat \
     && rm -rf /var/lib/apt/lists/* \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone
@@ -35,6 +35,7 @@ COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/access-control.conf /etc/nginx/conf.d/access-control.conf
 COPY nginx/server.conf.template /etc/nginx/templates/server.conf.template
 COPY nginx/auth.html /usr/share/nginx/auth/auth.html
+COPY nginx/admin.html /usr/share/nginx/admin/index.html
 
 COPY scripts/ /root/scripts/
 RUN chmod +x /root/scripts/*.sh

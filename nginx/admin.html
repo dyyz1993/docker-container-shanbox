@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shanbox 路由管理</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #1a1d27;
+  --bg-tertiary: #242837;
+  --bg-input: #2a2e3d;
+  --border: #2e3348;
+  --border-focus: #4a6cf7;
+  --text-primary: #e4e6f0;
+  --text-secondary: #8b8fa8;
+  --text-muted: #5c6078;
+  --accent: #4a6cf7;
+  --accent-hover: #5b7bf8;
+  --accent-glow: rgba(74, 108, 247, 0.15);
+  --success: #34d399;
+  --danger: #f87171;
+  --danger-hover: #ef4444;
+  --warning: #fbbf24;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow: 0 4px 24px rgba(0,0,0,.25);
+  --transition: .2s ease;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.container { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+
+/* ── Header ── */
+.header { margin-bottom: 32px; }
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -.5px;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.header p { color: var(--text-secondary); font-size: 14px; margin-top: 4px; }
+
+/* ── Stats ── */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+.stat-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  transition: border-color var(--transition);
+}
+.stat-card:hover { border-color: var(--accent); }
+.stat-value { font-size: 32px; font-weight: 700; line-height: 1.2; }
+.stat-value.total { color: var(--text-primary); }
+.stat-value.up { color: var(--success); }
+.stat-value.down { color: var(--danger); }
+.stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+/* ── Form ── */
+.form-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 32px;
+}
+.form-section h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 120px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.form-group input,
+.form-group select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  width: 100%;
+}
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.form-group select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b8fa8'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+.policy-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  min-height: 18px;
+}
+.btn-submit {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition);
+  height: 42px;
+  align-self: end;
+  white-space: nowrap;
+}
+.btn-submit:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.btn-submit:active { transform: translateY(0); }
+.btn-submit:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* ── Table ── */
+.table-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.table-header h2 { font-size: 16px; font-weight: 600; }
+.refresh-info { font-size: 12px; color: var(--text-muted); }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+tbody tr { transition: background var(--transition); }
+tbody tr:hover { background: rgba(74,108,247,.04); }
+tbody td {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+tbody tr:last-child td { border-bottom: none; }
+
+.domain { font-weight: 500; color: var(--text-primary); }
+.port-badge {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+/* Policy badges */
+.badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+.badge-public { background: rgba(52,211,153,.12); color: #34d399; }
+.badge-key { background: rgba(74,108,247,.12); color: #818cf8; }
+.badge-header { background: rgba(251,191,36,.12); color: #fbbf24; }
+.badge-private { background: rgba(248,113,113,.12); color: #f87171; }
+
+/* Status dots */
+.status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.up { background: var(--success); box-shadow: 0 0 8px rgba(52,211,153,.5); animation: pulse 2s infinite; }
+.status-dot.down { background: var(--danger); box-shadow: 0 0 8px rgba(248,113,113,.3); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+.status-text.up { color: var(--success); }
+.status-text.down { color: var(--danger); }
+
+/* Delete button */
+.btn-delete {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-delete:hover { color: var(--danger); border-color: var(--danger); background: rgba(248,113,113,.08); }
+
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* ── Toast ── */
+.toast-container { position: fixed; top: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+.toast {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  font-size: 14px;
+  color: var(--text-primary);
+  box-shadow: var(--shadow);
+  animation: slideIn .3s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 280px;
+  max-width: 400px;
+}
+.toast.success { border-left: 3px solid var(--success); }
+.toast.error { border-left: 3px solid var(--danger); }
+.toast-icon { font-size: 16px; flex-shrink: 0; }
+.toast.removing { animation: slideOut .25s ease forwards; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(60px); } }
+
+/* ── Confirm overlay ── */
+.confirm-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 8000;
+  animation: fadeIn .15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.confirm-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: 380px;
+  box-shadow: 0 12px 48px rgba(0,0,0,.4);
+}
+.confirm-box h3 { font-size: 16px; margin-bottom: 10px; }
+.confirm-box p { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5; }
+.confirm-box strong { color: var(--text-primary); }
+.confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.btn-cancel {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 20px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-cancel:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.btn-confirm-delete {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.btn-confirm-delete:hover { background: var(--danger-hover); }
+
+/* ── Spinner ── */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-row td { text-align: center; color: var(--text-muted); padding: 32px; }
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .container { padding: 20px 16px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr; }
+  thead th, tbody td { padding: 12px 16px; font-size: 13px; }
+  .header h1 { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Shanbox 路由管理</h1>
+    <p>管理子域名路由转发规则</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-value total" id="stat-total">-</div>
+      <div class="stat-label">总路由数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value up" id="stat-up">-</div>
+      <div class="stat-label">运行中</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value down" id="stat-down">-</div>
+      <div class="stat-label">已停止</div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <h2>添加路由</h2>
+    <form id="add-form" class="form-grid" autocomplete="off">
+      <div class="form-group">
+        <label for="subdomain">子域名</label>
+        <input type="text" id="subdomain" placeholder="例如: app" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" title="仅允许小写字母、数字和连字符">
+        <div class="policy-desc" id="domain-preview"></div>
+      </div>
+      <div class="form-group">
+        <label for="port">端口</label>
+        <input type="number" id="port" placeholder="3000" required min="1" max="65535">
+      </div>
+      <div class="form-group">
+        <label for="policy">访问策略</label>
+        <select id="policy">
+          <option value="public">public - 完全开放</option>
+          <option value="key">key - URL 参数认证</option>
+          <option value="header">header - 请求头认证</option>
+          <option value="private">private - 仅内网</option>
+        </select>
+        <div class="policy-desc" id="policy-desc">完全开放，无需认证</div>
+      </div>
+      <button type="submit" class="btn-submit" id="btn-add">添加路由</button>
+    </form>
+  </div>
+
+  <div class="table-section">
+    <div class="table-header">
+      <h2>路由列表</h2>
+      <div class="refresh-info">每 10 秒自动刷新</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>域名</th>
+            <th>端口</th>
+            <th>策略</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="routes-body">
+          <tr class="loading-row"><td colspan="5"><span class="spinner"></span> 加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+(function() {
+  const API = '/__api__/routes';
+  const SUFFIX = '.shanbox.19930810.xyz';
+
+  const POLICY_MAP = {
+    public: { label: 'public', desc: '完全开放，无需认证' },
+    key: { label: 'key', desc: 'URL 参数认证 (?key=xxx)' },
+    header: { label: 'header', desc: '请求头认证 (X-Auth-Token)' },
+    private: { label: 'private', desc: '仅内网/白名单可访问' }
+  };
+
+  const $body = document.getElementById('routes-body');
+  const $form = document.getElementById('add-form');
+  const $subdomain = document.getElementById('subdomain');
+  const $port = document.getElementById('port');
+  const $policy = document.getElementById('policy');
+  const $policyDesc = document.getElementById('policy-desc');
+  const $domainPreview = document.getElementById('domain-preview');
+  const $statTotal = document.getElementById('stat-total');
+  const $statUp = document.getElementById('stat-up');
+  const $statDown = document.getElementById('stat-down');
+  const $btnAdd = document.getElementById('btn-add');
+  const $toasts = document.getElementById('toast-container');
+
+  let refreshTimer = null;
+
+  // ── Toast ──
+  function toast(msg, type) {
+    const el = document.createElement('div');
+    el.className = 'toast ' + type;
+    const icon = type === 'success' ? '\u2713' : '\u2717';
+    el.innerHTML = '<span class="toast-icon">' + icon + '</span><span>' + escapeHtml(msg) + '</span>';
+    $toasts.appendChild(el);
+    setTimeout(function() {
+      el.classList.add('removing');
+      setTimeout(function() { el.remove(); }, 250);
+    }, 3000);
+  }
+
+  // ── Confirm dialog ──
+  function confirmDelete(domain, cb) {
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML =
+      '<div class="confirm-box">' +
+        '<h3>\u786E\u8BA4\u5220\u9664</h3>' +
+        '<p>\u786E\u5B9A\u8981\u5220\u9664\u8DEF\u7531 <strong>' + escapeHtml(domain) + '</strong> \u5417\uFF1F\u6B64\u64CD\u4F5C\u4E0D\u53EF\u64A4\u9500\u3002</p>' +
+        '<div class="confirm-actions">' +
+          '<button class="btn-cancel" id="dlg-cancel">\u53D6\u6D88</button>' +
+          '<button class="btn-confirm-delete" id="dlg-confirm">\u5220\u9664</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#dlg-cancel').onclick = function() { overlay.remove(); };
+    overlay.querySelector('#dlg-confirm').onclick = function() { overlay.remove(); cb(); };
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  }
+
+  // ── Helpers ──
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function renderRow(r) {
+    var domain = r.subdomain + SUFFIX;
+    var statusClass = r.status === 'up' ? 'up' : 'down';
+    var statusText = r.status === 'up' ? '\u8FD0\u884C\u4E2D' : '\u5DF2\u505C\u6B62';
+    return '<tr data-subdomain="' + escapeHtml(r.subdomain) + '">' +
+      '<td><span class="domain">' + escapeHtml(domain) + '</span></td>' +
+      '<td><span class="port-badge">' + r.port + '</span></td>' +
+      '<td><span class="badge badge-' + r.policy + '">' + POLICY_MAP[r.policy].label + '</span></td>' +
+      '<td><span class="status"><span class="status-dot ' + statusClass + '"></span><span class="status-text ' + statusClass + '">' + statusText + '</span></span></td>' +
+      '<td><button class="btn-delete" data-subdomain="' + escapeHtml(r.subdomain) + '" data-domain="' + escapeHtml(domain) + '">\u5220\u9664</button></td>' +
+    '</tr>';
+  }
+
+  function renderEmpty() {
+    return '<tr><td colspan="5" class="empty-state">\u6682\u65E0\u8DEF\u7531\uFF0C\u8BF7\u6DFB\u52A0\u7B2C\u4E00\u6761\u8DEF\u7531</td></tr>';
+  }
+
+  // ── Fetch routes ──
+  function fetchRoutes() {
+    fetch(API + '/status', { credentials: 'same-origin' })
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(routes) {
+        $statTotal.textContent = routes.length;
+        var up = routes.filter(function(r) { return r.status === 'up'; }).length;
+        $statUp.textContent = up;
+        $statDown.textContent = routes.length - up;
+
+        if (routes.length === 0) {
+          $body.innerHTML = renderEmpty();
+          return;
+        }
+        routes.sort(function(a, b) { return a.subdomain.localeCompare(b.subdomain); });
+        $body.innerHTML = routes.map(renderRow).join('');
+      })
+      .catch(function(err) {
+        $body.innerHTML = '<tr><td colspan="5" class="empty-state">\u52A0\u8F7D\u5931\u8D25\uFF1A' + escapeHtml(err.message) + '</td></tr>';
+      });
+  }
+
+  // ── Add route ──
+  $form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var subdomain = $subdomain.value.trim().toLowerCase();
+    var port = parseInt($port.value, 10);
+    var policy = $policy.value;
+
+    if (!subdomain || !port) return;
+
+    $btnAdd.disabled = true;
+    $btnAdd.textContent = '\u6DFB\u52A0\u4E2D...';
+
+    fetch(API, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subdomain: subdomain, port: port, policy: policy })
+    })
+    .then(function(res) {
+      if (!res.ok) return res.text().then(function(t) { throw new Error(t || 'HTTP ' + res.status); });
+      return res.json();
+    })
+    .then(function() {
+      toast('\u8DEF\u7531 ' + subdomain + SUFFIX + ' \u6DFB\u52A0\u6210\u529F', 'success');
+      $form.reset();
+      $policyDesc.textContent = POLICY_MAP['public'].desc;
+      $domainPreview.textContent = '';
+      fetchRoutes();
+    })
+    .catch(function(err) {
+      toast('\u6DFB\u52A0\u5931\u8D25\uFF1A' + err.message, 'error');
+    })
+    .finally(function() {
+      $btnAdd.disabled = false;
+      $btnAdd.textContent = '\u6DFB\u52A0\u8DEF\u7531';
+    });
+  });
+
+  // ── Delete route (event delegation) ──
+  $body.addEventListener('click', function(e) {
+    var btn = e.target.closest('.btn-delete');
+    if (!btn) return;
+    var subdomain = btn.getAttribute('data-subdomain');
+    var domain = btn.getAttribute('data-domain');
+    confirmDelete(domain, function() {
+      fetch(API + '/' + encodeURIComponent(subdomain), {
+        method: 'DELETE',
+        credentials: 'same-origin'
+      })
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        toast('\u8DEF\u7531 ' + domain + ' \u5DF2\u5220\u9664', 'success');
+        fetchRoutes();
+      })
+      .catch(function(err) {
+        toast('\u5220\u9664\u5931\u8D25\uFF1A' + err.message, 'error');
+      });
+    });
+  });
+
+  // ── Policy description ──
+  $policy.addEventListener('change', function() {
+    $policyDesc.textContent = POLICY_MAP[$policy.value].desc;
+  });
+
+  // ── Domain preview ──
+  $subdomain.addEventListener('input', function() {
+    var v = $subdomain.value.trim().toLowerCase();
+    $domainPreview.textContent = v ? v + SUFFIX : '';
+  });
+
+  // ── Auto refresh ──
+  function startRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(fetchRoutes, 10000);
+  }
+
+  // ── Init ──
+  fetchRoutes();
+  startRefresh();
+})();
+</script>
+</body>
+</html>
