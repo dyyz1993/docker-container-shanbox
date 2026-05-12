@@ -17,6 +17,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone
 
+ARG INSTALL_NODE=false
+ARG INSTALL_PYTHON=false
+ARG INSTALL_TMUX=false
+
+RUN if [ "$INSTALL_NODE" = "true" ]; then \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*; \
+    fi
+
+RUN if [ "$INSTALL_PYTHON" = "true" ]; then \
+    apt-get update && \
+    apt-get install -y --no-install-recommends python3 python3-pip && \
+    rm -rf /var/lib/apt/lists/*; \
+    fi
+
+RUN if [ "$INSTALL_TMUX" = "true" ]; then \
+    apt-get update && \
+    apt-get install -y --no-install-recommends tmux && \
+    rm -rf /var/lib/apt/lists/*; \
+    fi
+
 RUN mkdir -p /var/run/sshd /root/.ssh \
     && chmod 700 /root/.ssh \
     && sed -i 's/#PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config \
