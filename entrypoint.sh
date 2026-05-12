@@ -1,41 +1,88 @@
 #!/bin/bash
 set -e
 
+# ==========================================
+# 1. SSH Key injection
+# ==========================================
 if [ -n "$SSH_PUBLIC_KEY" ]; then
     echo "$SSH_PUBLIC_KEY" > /root/.ssh/authorized_keys
     chmod 600 /root/.ssh/authorized_keys
 fi
-
 if [ -f /ssh/authorized_keys ]; then
     cp /ssh/authorized_keys /root/.ssh/authorized_keys
     chmod 600 /root/.ssh/authorized_keys
 fi
-
 if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
-    ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N ''
+    ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N '' -q
 fi
-
 if [ ! -f /etc/ssh/ssh_host_ed25519_key ]; then
-    ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ''
+    ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N '' -q
 fi
 
+# ==========================================
+# 2. SSL Certificate (self-signed fallback)
+# ==========================================
+if [ ! -f /etc/nginx/ssl/cert.pem ]; then
+    echo "[entrypoint] Generating self-signed SSL certificate..."
+    mkdir -p /etc/nginx/ssl
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout /etc/nginx/ssl/key.pem \
+        -out /etc/nginx/ssl/cert.pem \
+        -subj "/CN=*.${DOMAIN:-example.com}" 2>/dev/null
+fi
+
+# ==========================================
+# 3. Peer IP detection (PUBLIC_IP)
+# ==========================================
 if [ -n "$PUBLIC_IP" ]; then
-    export PUBLIC_IP
-    if [ -f /etc/nginx/templates/server.conf.template ]; then
-        envsubst '${PUBLIC_IP}' < /etc/nginx/templates/server.conf.template > /etc/nginx/conf.d/server.conf
-    fi
+    cat > /etc/nginx/conf.d/geo_peer.conf << NGINXEOF
+geo \$is_peer {
+    default 0;
+    ${PUBLIC_IP} 1;
+}
+NGINXEOF
 else
-    if [ -f /etc/nginx/templates/server.conf.template ]; then
-        envsubst < /etc/nginx/templates/server.conf.template > /etc/nginx/conf.d/server.conf
-    fi
+    cat > /etc/nginx/conf.d/geo_peer.conf << NGINXEOF
+geo \$is_peer {
+    default 0;
+}
+NGINXEOF
 fi
 
+# ==========================================
+# 4. Nginx config generation
+# ==========================================
+envsubst '${PUBLIC_IP} ${DOMAIN}' \
+    < /etc/nginx/templates/server.conf.template \
+    > /etc/nginx/conf.d/server.conf
+
+# ==========================================
+# 5. Routes config
+# ==========================================
 if [ -f /etc/nginx/custom/routes.conf ]; then
-    cp /etc/nginx/custom/routes.conf /etc/nginx/conf.d/routes.conf
+    cp /etc/nginx/custom/routes.conf /etc/nginx/routes.d/default.conf
+elif [ ! -f /etc/nginx/routes.d/default.conf ]; then
+    cat > /etc/nginx/routes.d/default.conf << 'NGINXEOF'
+map $host $backend_port {
+    default              0;
+}
+
+map $host $access_policy {
+    default              "public";
+}
+NGINXEOF
 fi
 
+# ==========================================
+# 6. Ensure dirs
+# ==========================================
 mkdir -p /root/scripts /root/data /var/log/supervisor
 
+# ==========================================
+# 7. Validate & Start
+# ==========================================
+echo "[entrypoint] Checking Nginx config..."
 nginx -t
 
+echo "[entrypoint] Starting supervisor..."
 exec "$@"

@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     cron \
     ca-certificates \
+    openssl \
+    gettext-base \
     && rm -rf /var/lib/apt/lists/* \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone
@@ -20,7 +22,8 @@ RUN mkdir -p /var/run/sshd /root/.ssh \
     && sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config \
     && sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 
-RUN rm -f /etc/nginx/sites-enabled/default
+RUN rm -f /etc/nginx/sites-enabled/default \
+    && mkdir -p /usr/share/nginx/auth /etc/nginx/ssl /etc/nginx/routes.d /var/www
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -30,6 +33,10 @@ COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/access-control.conf /etc/nginx/conf.d/access-control.conf
 COPY nginx/server.conf.template /etc/nginx/templates/server.conf.template
+COPY nginx/auth.html /usr/share/nginx/auth/auth.html
+
+COPY scripts/ /root/scripts/
+RUN chmod +x /root/scripts/*.sh
 
 WORKDIR /root
 

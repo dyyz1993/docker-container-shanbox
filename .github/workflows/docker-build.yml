@@ -50,7 +50,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
 
   test:
     runs-on: ubuntu-latest
@@ -58,9 +58,6 @@ jobs:
     if: github.event_name == 'push'
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
@@ -70,51 +67,44 @@ jobs:
 
       - name: Pull and test image
         run: |
-          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          docker pull "$IMAGE_TAG"
-
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          docker pull "$IMAGE"
           echo "=== Test 1: Container starts ==="
-          docker run -d --name shanbox-test \
+          docker run -d --name testbox \
             -e SSH_PUBLIC_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCtest test@ci" \
-            -p 2222:22 \
-            -p 8443:443 \
-            -p 8080:80 \
-            "$IMAGE_TAG"
+            -p 2222:22 -p 8443:443 -p 8080:80 \
+            "$IMAGE"
+          sleep 8
 
-          echo "Waiting for services to start..."
-          sleep 10
+          echo "=== Test 2: Container running ==="
+          docker ps | grep testbox
 
-          echo "=== Test 2: Check container is running ==="
-          docker ps | grep shanbox-test
+          echo "=== Test 3: sshd ==="
+          docker exec testbox pgrep sshd && echo "sshd: OK"
 
-          echo "=== Test 3: Verify sshd is running ==="
-          docker exec shanbox-test pgrep sshd && echo "sshd: OK" || echo "sshd: FAIL"
+          echo "=== Test 4: nginx ==="
+          docker exec testbox pgrep nginx && echo "nginx: OK"
 
-          echo "=== Test 4: Verify nginx is running ==="
-          docker exec shanbox-test pgrep nginx && echo "nginx: OK" || echo "nginx: FAIL"
+          echo "=== Test 5: cron ==="
+          docker exec testbox pgrep cron && echo "cron: OK"
 
-          echo "=== Test 5: Verify cron is running ==="
-          docker exec shanbox-test pgrep cron && echo "cron: OK" || echo "cron: FAIL"
+          echo "=== Test 6: SSH key ==="
+          docker exec testbox cat /root/.ssh/authorized_keys | grep "test@ci" && echo "SSH key: OK"
 
-          echo "=== Test 6: Check SSH key injected ==="
-          docker exec shanbox-test cat /root/.ssh/authorized_keys | grep "test@ci" && echo "SSH key: OK" || echo "SSH key: FAIL"
+          echo "=== Test 7: Password auth disabled ==="
+          docker exec testbox grep "^PasswordAuthentication no" /etc/ssh/sshd_config && echo "PasswordAuth: OK"
 
-          echo "=== Test 7: Check SSH password auth disabled ==="
-          docker exec shanbox-test grep "^PasswordAuthentication no" /etc/ssh/sshd_config && echo "PasswordAuth disabled: OK" || echo "PasswordAuth disabled: FAIL"
+          echo "=== Test 8: Self-signed SSL ==="
+          docker exec testbox test -f /etc/nginx/ssl/cert.pem && echo "SSL cert: OK"
+          docker exec testbox test -f /etc/nginx/ssl/key.pem && echo "SSL key: OK"
 
-          echo "=== Test 8: HTTP redirect to HTTPS ==="
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 2>/dev/null || true)
-          if [ "$HTTP_CODE" = "301" ]; then
-            echo "HTTP redirect: OK (301)"
-          else
-            echo "HTTP redirect: OK (got $HTTP_CODE, nginx may require SSL cert)"
-          fi
+          echo "=== Test 9: Supervisor ==="
+          docker exec testbox supervisorctl status
 
-          echo "=== Test 9: Supervisor processes ==="
-          docker exec shanbox-test supervisorctl status
+          echo "=== Test 10: Nginx config test ==="
+          docker exec testbox nginx -t
 
           echo "=== Cleanup ==="
-          docker stop shanbox-test
-          docker rm shanbox-test
+          docker stop testbox && docker rm testbox
 
-          echo "=== All tests passed ==="
+          echo "=== ALL TESTS PASSED ==="
