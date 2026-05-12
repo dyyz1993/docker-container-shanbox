@@ -36,6 +36,7 @@ server {
         if ($access_policy = "key")     { set $auth_key_fail "1"; }
         if ($access_policy = "public")  { set $auth_key_fail "0"; }
         if ($is_local = 1)              { set $auth_key_fail "0"; }
+        if ($is_real_local = 1)         { set $auth_key_fail "0"; }
         if ($is_peer  = 1)              { set $auth_key_fail "0"; }
         if ($arg_key != "")             { set $auth_key_fail "0"; }
 
@@ -44,6 +45,7 @@ server {
         if ($access_policy = "header")  { set $auth_header_fail "1"; }
         if ($access_policy = "public")  { set $auth_header_fail "0"; }
         if ($is_local = 1)              { set $auth_header_fail "0"; }
+        if ($is_real_local = 1)         { set $auth_header_fail "0"; }
         if ($is_peer  = 1)              { set $auth_header_fail "0"; }
         if ($http_x_auth_token != "")   { set $auth_header_fail "0"; }
 
@@ -52,6 +54,7 @@ server {
         if ($access_policy = "private") { set $auth_private_fail "1"; }
         if ($access_policy = "public")  { set $auth_private_fail "0"; }
         if ($is_local = 1)              { set $auth_private_fail "0"; }
+        if ($is_real_local = 1)         { set $auth_private_fail "0"; }
         if ($is_peer  = 1)              { set $auth_private_fail "0"; }
 
         set $auth_fail "0";
