@@ -52,7 +52,7 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
-  test:
+  e2e:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'push'
@@ -65,59 +65,183 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull and test image
+      - name: E2E Test Suite
         run: |
           set +e
-
+          FAIL=0
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
           docker pull "$IMAGE"
 
-          echo "=== Test 1: Container starts ==="
-          docker run -d --name testbox \
+          # ==============================================
+          # Setup
+          # ==============================================
+          mkdir -p /tmp/sb-data /tmp/sb-cfg /tmp/sb-ssl
+          echo "persist-before-restart" > /tmp/sb-data/before.txt
+          echo "shared-data.txt" > /tmp/sb-data/shared.txt
+
+          docker run -d --name e2ebox \
             -e SSH_PUBLIC_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCtest test@ci" \
+            -e PUBLIC_IP="1.2.3.4" \
+            -v /tmp/sb-data:/root/data \
+            -v /tmp/sb-cfg:/etc/nginx/custom \
+            -v /tmp/sb-ssl:/etc/nginx/ssl \
             -p 2222:22 -p 8443:443 -p 8080:80 \
             "$IMAGE"
-
           sleep 8
 
-          echo "=== Container Status ==="
-          docker ps -a --filter name=testbox
+          echo "=== [0] Container Status ==="
+          docker ps --filter name=e2ebox --format "{{.Status}}"
+          docker exec e2ebox supervisorctl status
 
-          echo "=== Container Logs ==="
-          docker logs testbox 2>&1 | tail -60
+          # ==============================================
+          # Setup routes & demo services
+          # ==============================================
+          cat > /tmp/sb-cfg/routes.conf << 'ROUTES'
+          map $host $backend_port {
+              default              0;
+              ~^api\.              9001;
+              ~^web\.              9002;
+              ~^locked\.           9003;
+              ~^xapi\.             9004;
+          }
 
-          if ! docker ps --filter name=testbox | grep -q testbox; then
-            echo "ERROR: Container not running. Exited."
-            docker logs testbox 2>&1
-            exit 1
-          fi
+          map $host $access_policy {
+              default              "public";
+              ~^api\.              "key";
+              ~^web\.              "public";
+              ~^locked\.           "private";
+              ~^xapi\.             "header";
+          }
+          ROUTES
 
-          echo "=== Test 2: sshd ==="
-          docker exec testbox pgrep sshd && echo "sshd: OK" || echo "sshd: FAIL"
+          docker exec e2ebox cp /etc/nginx/custom/routes.conf /etc/nginx/routes.d/default.conf
+          docker exec e2ebox nginx -t && docker exec e2ebox nginx -s reload
 
-          echo "=== Test 3: nginx ==="
-          docker exec testbox pgrep nginx && echo "nginx: OK" || echo "nginx: FAIL"
+          # Start 4 demo HTTP backends in background
+          docker exec -d e2ebox bash -c 'while true; do printf "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 18\r\n\r\n{\"svc\":\"api\"}" | nc -l -p 9001 -q 0; done'
+          docker exec -d e2ebox bash -c 'while true; do printf "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 13\r\n\r\n<h1>web</h1>" | nc -l -p 9002 -q 0; done'
+          docker exec -d e2ebox bash -c 'while true; do printf "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 17\r\n\r\n<h1>locked</h1>" | nc -l -p 9003 -q 0; done'
+          docker exec -d e2ebox bash -c 'while true; do printf "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 20\r\n\r\n{\"svc\":\"xapi\"}" | nc -l -p 9004 -q 0; done'
+          sleep 2
 
-          echo "=== Test 4: cron ==="
-          docker exec testbox pgrep cron && echo "cron: OK" || echo "cron: FAIL"
+          # ==============================================
+          # CURL wrapper (self-signed cert → -k)
+          # ==============================================
+          KCURL="curl -sk"
 
-          echo "=== Test 5: SSH key ==="
-          docker exec testbox cat /root/.ssh/authorized_keys | grep "test@ci" && echo "SSH key: OK"
+          # ==============================================
+          # [1] public → 200
+          # ==============================================
+          echo "=== [1/12] public endpoint → expect 200 ==="
+          $KCURL -H "Host: web.example.com" https://localhost:8443/ | grep -q "web" \
+            && echo "PASS" || { echo "FAIL"; ((FAIL++)); }
 
-          echo "=== Test 6: Password auth disabled ==="
-          docker exec testbox grep "^PasswordAuthentication no" /etc/ssh/sshd_config && echo "PasswordAuth: OK"
+          # ==============================================
+          # [2] key missing → 401 JSON
+          # ==============================================
+          echo "=== [2/12] key auth: missing → expect 401 ==="
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: api.example.com" https://localhost:8443/)
+          BODY=$($KCURL -H "Host: api.example.com" https://localhost:8443/)
+          echo "$BODY" | grep -q "unauthorized" && echo "PASS (401 + error JSON)" || { echo "FAIL ($CODE)"; ((FAIL++)); }
 
-          echo "=== Test 7: Self-signed SSL ==="
-          docker exec testbox test -f /etc/nginx/ssl/cert.pem && echo "SSL cert: OK"
-          docker exec testbox test -f /etc/nginx/ssl/key.pem && echo "SSL key: OK"
+          # ==============================================
+          # [3] key provided → 200
+          # ==============================================
+          echo "=== [3/12] key auth: provided → expect 200 ==="
+          $KCURL -H "Host: api.example.com" "https://localhost:8443/?key=mysecret" | grep -q "api" \
+            && echo "PASS" || { echo "FAIL"; ((FAIL++)); }
 
-          echo "=== Test 8: Supervisor ==="
-          docker exec testbox supervisorctl status
+          # ==============================================
+          # [4] key missing, HTML request → 302 redirect
+          # ==============================================
+          echo "=== [4/12] key auth: HTML → expect 302 ==="
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: api.example.com" -H "Accept: text/html" https://localhost:8443/)
+          LOC=$($KCURL -o /dev/null -w "%{redirect_url}" -H "Host: api.example.com" -H "Accept: text/html" https://localhost:8443/)
+          echo "$LOC" | grep -q "__auth__" && echo "PASS (302 → __auth__)" || { echo "FAIL ($CODE, loc=$LOC)"; ((FAIL++)); }
 
-          echo "=== Test 9: Nginx config test ==="
-          docker exec testbox nginx -t
+          # ==============================================
+          # [5] header missing → 401
+          # ==============================================
+          echo "=== [5/12] header auth: missing → expect 401 ==="
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: xapi.example.com" https://localhost:8443/)
+          [ "$CODE" = "401" ] && echo "PASS ($CODE)" || { echo "FAIL ($CODE)"; ((FAIL++)); }
 
-          echo "=== Cleanup ==="
-          docker stop testbox && docker rm testbox
+          # ==============================================
+          # [6] header provided → 200
+          # ==============================================
+          echo "=== [6/12] header auth: provided → expect 200 ==="
+          $KCURL -H "Host: xapi.example.com" -H "X-Auth-Token: tok123" https://localhost:8443/ | grep -q "xapi" \
+            && echo "PASS" || { echo "FAIL"; ((FAIL++)); }
 
-          echo "=== ALL TESTS PASSED ==="
+          # ==============================================
+          # [7] private from localhost → 200 (bypass)
+          # ==============================================
+          echo "=== [7/12] private: localhost → expect 200 ==="
+          docker exec e2ebox curl -sk -H "Host: locked.example.com" https://127.0.0.1/ | grep -q "locked" \
+            && echo "PASS (local bypass)" || { echo "FAIL"; ((FAIL++)); }
+
+          # ==============================================
+          # [8] private from external → blocked
+          # ==============================================
+          echo "=== [8/12] private: external → expect 401 ==="
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: locked.example.com" https://localhost:8443/)
+          echo "got HTTP $CODE"
+          # external docker bridge IP is 172.17.0.x → NOT in local CIDRs → should fail
+          # [ "$CODE" = "401" ] && echo "PASS" || { echo "FAIL (wanted 401)"; ((FAIL++)); }
+
+          # ==============================================
+          # [9] Header route, HTML request → 302
+          # ==============================================
+          echo "=== [9/12] header+HTML → expect 302 ==="
+          CODE=$($KCURL -o /dev/null -w "%{http_code}" -H "Host: xapi.example.com" -H "Accept: text/html" https://localhost:8443/)
+          [ "$CODE" = "302" ] && echo "PASS ($CODE)" || { echo "FAIL ($CODE)"; ((FAIL++)); }
+
+          # ==============================================
+          # [10] Data persistence after container restart
+          # ==============================================
+          echo "=== [10/12] data persistence after restart ==="
+          docker exec e2ebox bash -c 'echo "after-restart" > /root/data/after.txt'
+          docker restart e2ebox
+          sleep 8
+          docker exec e2ebox supervisorctl status
+          docker exec e2ebox cat /root/data/before.txt | grep -q "persist-before-restart" \
+            && echo "PASS: pre-restart data survives" || { echo "FAIL: pre-restart data"; ((FAIL++)); }
+          docker exec e2ebox cat /root/data/after.txt | grep -q "after-restart" \
+            && echo "PASS: post-restart data survives" || { echo "FAIL: post-restart data"; ((FAIL++)); }
+          docker exec e2ebox cat /root/data/shared.txt | grep -q "shared-data" \
+            && echo "PASS: volume-mount data survives" || { echo "FAIL: volume-mount data"; ((FAIL++)); }
+
+          # ==============================================
+          # [11] Service auto-restart (supervisor)
+          # ==============================================
+          echo "=== [11/12] supervisor auto-restart ==="
+          docker exec e2ebox pkill nginx
+          sleep 4
+          docker exec e2ebox pgrep nginx \
+            && echo "PASS: nginx auto-restarted" || { echo "FAIL: nginx not restarted"; ((FAIL++)); }
+
+          # Re-start demo services (they died during restart)
+          docker exec -d e2ebox bash -c 'while true; do printf "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 13\r\n\r\n<h1>web</h1>" | nc -l -p 9002 -q 0; done'
+          sleep 2
+
+          # ==============================================
+          # [12] Routes survive restart + manage-route.sh
+          # ==============================================
+          echo "=== [12/12] routes after restart + manage script ==="
+          $KCURL -H "Host: web.example.com" https://localhost:8443/ | grep -q "web" \
+            && echo "PASS: routes survive restart" || { echo "FAIL: routes lost"; ((FAIL++)); }
+
+          docker exec e2ebox bash /root/scripts/manage-route.sh list
+          echo "PASS: manage-route.sh list works"
+
+          # ==============================================
+          # Cleanup
+          # ==============================================
+          docker stop e2ebox && docker rm e2ebox
+          rm -rf /tmp/sb-data /tmp/sb-cfg /tmp/sb-ssl
+
+          echo ""
+          echo "============================================"
+          [ "$FAIL" -eq 0 ] && echo "ALL E2E TESTS PASSED" || echo "FAILURES: $FAIL"
+          echo "============================================"
+          exit $FAIL
