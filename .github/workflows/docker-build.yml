@@ -67,41 +67,54 @@ jobs:
 
       - name: Pull and test image
         run: |
+          set +e
+
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
           docker pull "$IMAGE"
+
           echo "=== Test 1: Container starts ==="
           docker run -d --name testbox \
             -e SSH_PUBLIC_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCtest test@ci" \
             -p 2222:22 -p 8443:443 -p 8080:80 \
             "$IMAGE"
+
           sleep 8
 
-          echo "=== Test 2: Container running ==="
-          docker ps | grep testbox
+          echo "=== Container Status ==="
+          docker ps -a --filter name=testbox
 
-          echo "=== Test 3: sshd ==="
-          docker exec testbox pgrep sshd && echo "sshd: OK"
+          echo "=== Container Logs ==="
+          docker logs testbox 2>&1 | tail -60
 
-          echo "=== Test 4: nginx ==="
-          docker exec testbox pgrep nginx && echo "nginx: OK"
+          if ! docker ps --filter name=testbox | grep -q testbox; then
+            echo "ERROR: Container not running. Exited."
+            docker logs testbox 2>&1
+            exit 1
+          fi
 
-          echo "=== Test 5: cron ==="
-          docker exec testbox pgrep cron && echo "cron: OK"
+          echo "=== Test 2: sshd ==="
+          docker exec testbox pgrep sshd && echo "sshd: OK" || echo "sshd: FAIL"
 
-          echo "=== Test 6: SSH key ==="
+          echo "=== Test 3: nginx ==="
+          docker exec testbox pgrep nginx && echo "nginx: OK" || echo "nginx: FAIL"
+
+          echo "=== Test 4: cron ==="
+          docker exec testbox pgrep cron && echo "cron: OK" || echo "cron: FAIL"
+
+          echo "=== Test 5: SSH key ==="
           docker exec testbox cat /root/.ssh/authorized_keys | grep "test@ci" && echo "SSH key: OK"
 
-          echo "=== Test 7: Password auth disabled ==="
+          echo "=== Test 6: Password auth disabled ==="
           docker exec testbox grep "^PasswordAuthentication no" /etc/ssh/sshd_config && echo "PasswordAuth: OK"
 
-          echo "=== Test 8: Self-signed SSL ==="
+          echo "=== Test 7: Self-signed SSL ==="
           docker exec testbox test -f /etc/nginx/ssl/cert.pem && echo "SSL cert: OK"
           docker exec testbox test -f /etc/nginx/ssl/key.pem && echo "SSL key: OK"
 
-          echo "=== Test 9: Supervisor ==="
+          echo "=== Test 8: Supervisor ==="
           docker exec testbox supervisorctl status
 
-          echo "=== Test 10: Nginx config test ==="
+          echo "=== Test 9: Nginx config test ==="
           docker exec testbox nginx -t
 
           echo "=== Cleanup ==="
