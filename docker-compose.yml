@@ -1,0 +1,21 @@
+services:
+  server:
+    build: .
+    container_name: shanbox
+    restart: unless-stopped
+    ports:
+      - "2222:22"
+      - "80:80"
+      - "443:443"
+    environment:
+      - SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
+      - PUBLIC_IP=${PUBLIC_IP}
+      - DOMAIN=${DOMAIN:-example.com}
+    volumes:
+      - ./config:/etc/nginx/custom
+      - ./ssl:/etc/nginx/ssl
+      - ./scripts:/root/scripts
+      - ./data:/root/data
+      - ./logs:/var/log
+    env_file:
+      - .env

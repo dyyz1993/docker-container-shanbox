@@ -1,0 +1,8 @@
+.env
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+logs/
+data/
+.opencode/
+.codenomad/
