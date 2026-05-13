@@ -11,11 +11,19 @@ METHOD=$(echo "$REQUEST_LINE" | awk '{print $1}')
 PATH_PART=$(echo "$REQUEST_LINE" | awk '{print $2}')
 
 CONTENT_LENGTH=0
+CALLER_IP=""
 while IFS= read -r line; do
     line=$(echo "$line" | tr -d '\r')
     [ -z "$line" ] && break
     if echo "$line" | grep -qi "^Content-Length:"; then
         CONTENT_LENGTH=$(echo "$line" | awk '{print $2}')
+    fi
+    if echo "$line" | grep -qi "^X-Real-IP:"; then
+        CALLER_IP=$(echo "$line" | awk '{print $2}' | xargs)
+    fi
+    if echo "$line" | grep -qi "^X-Forwarded-For:"; then
+        FIRST_IP=$(echo "$line" | awk '{print $2}' | cut -d, -f1 | xargs)
+        [ -z "$CALLER_IP" ] && CALLER_IP="$FIRST_IP"
     fi
 done
 
@@ -51,10 +59,28 @@ case "$METHOD" in
                 ADDRESS=$(echo "$BODY" | sed -n 's/.*"address"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
                 NAME=$(echo "$BODY" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
                 POLICY=$(echo "$BODY" | sed -n 's/.*"policy"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                PORT_ONLY=$(echo "$BODY" | sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
 
-                if [ -z "$ADDRESS" ]; then
-                    respond "400 Bad Request" "application/json" '{"error":"address is required (host:port or port)"}'
-                    exit 0
+                if [ -z "$ADDRESS" ] && [ -n "$PORT_ONLY" ]; then
+                    ADDRESS="$PORT_ONLY"
+                fi
+
+                ADDR_HOST=""
+                ADDR_PORT=""
+                if echo "$ADDRESS" | grep -q ':'; then
+                    ADDR_HOST=$(echo "$ADDRESS" | cut -d: -f1)
+                    ADDR_PORT=$(echo "$ADDRESS" | cut -d: -f2)
+                else
+                    ADDR_PORT="$ADDRESS"
+                fi
+
+                if echo "$ADDR_HOST" | grep -qiE '^(127\.0\.0\.1|localhost)$' || [ -z "$ADDR_HOST" ]; then
+                    if [ -n "$CALLER_IP" ]; then
+                        ADDRESS="${CALLER_IP}:${ADDR_PORT}"
+                    else
+                        respond "400 Bad Request" "application/json" '{"error":"cannot detect caller IP, specify address explicitly (e.g. 192.168.0.4:3000)"}'
+                        exit 0
+                    fi
                 fi
 
                 OUTPUT=$($ROUTES_SCRIPT register "$ADDRESS" "$NAME" "$POLICY" 2>&1)
