@@ -1,6 +1,6 @@
 services:
   server:
-    image: ghcr.io/dyyz1993/docker-container-shanbox:latest
+    image: ghcr.io/dyyz1993/docker-container-shanbox:full
     container_name: shanbox
     restart: unless-stopped
     ports:

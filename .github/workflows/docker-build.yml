@@ -22,7 +22,10 @@ jobs:
           - tag: latest
             build_args: ""
           - tag: full
-            build_args: "INSTALL_NODE=true,INSTALL_PYTHON=true,INSTALL_TMUX=true"
+            build_args: |
+              INSTALL_NODE=true
+              INSTALL_PYTHON=true
+              INSTALL_TMUX=true
 
     steps:
       - name: Checkout
