@@ -36,9 +36,9 @@ regenerate_conf() {
         echo "map \$host \$backend_port {"
         echo "    default              0;"
         if [ -f "$ROUTES_DATA" ]; then
-            while IFS='|' read -r sub host port policy key lan_only; do
-                [ -z "$sub" ] && continue
-                printf "    ~^%s\\.              %s;\n" "$sub" "$port"
+            while IFS='|' read -r r_sub r_host r_port r_policy r_key r_lan; do
+                [ -z "$r_sub" ] && continue
+                printf "    ~^%s\\.              %s;\n" "$r_sub" "$r_port"
             done < "$ROUTES_DATA"
         fi
         echo "}"
@@ -47,10 +47,10 @@ regenerate_conf() {
         echo "map \$host \$backend_host {"
         echo "    default              \"\";"
         if [ -f "$ROUTES_DATA" ]; then
-            while IFS='|' read -r sub host port policy key lan_only; do
-                [ -z "$sub" ] && continue
-                if [ -n "$host" ]; then
-                    printf "    ~^%s\\.              \"%s\";\n" "$sub" "$host"
+            while IFS='|' read -r r_sub r_host r_port r_policy r_key r_lan; do
+                [ -z "$r_sub" ] && continue
+                if [ -n "$r_host" ]; then
+                    printf "    ~^%s\\.              \"%s\";\n" "$r_sub" "$r_host"
                 fi
             done < "$ROUTES_DATA"
         fi
@@ -60,9 +60,9 @@ regenerate_conf() {
         echo "map \$host \$access_policy {"
         echo "    default              \"public\";"
         if [ -f "$ROUTES_DATA" ]; then
-            while IFS='|' read -r sub host port policy key lan_only; do
-                [ -z "$sub" ] && continue
-                printf "    ~^%s\\.              \"%s\";\n" "$sub" "$policy"
+            while IFS='|' read -r r_sub r_host r_port r_policy r_key r_lan; do
+                [ -z "$r_sub" ] && continue
+                printf "    ~^%s\\.              \"%s\";\n" "$r_sub" "$r_policy"
             done < "$ROUTES_DATA"
         fi
         echo "}"
@@ -71,10 +71,10 @@ regenerate_conf() {
         echo "map \$host\$arg_key \$key_valid {"
         echo "    default              0;"
         if [ -f "$ROUTES_DATA" ]; then
-            while IFS='|' read -r sub host port policy key lan_only; do
-                [ -z "$sub" ] && continue
-                if [ "$policy" = "key" ] && [ -n "$key" ]; then
-                    printf "    \"~^%s\\..*%s$\"  1;\n" "$sub" "$key"
+            while IFS='|' read -r r_sub r_host r_port r_policy r_key r_lan; do
+                [ -z "$r_sub" ] && continue
+                if [ "$r_policy" = "key" ] && [ -n "$r_key" ]; then
+                    printf "    \"~^%s\\..*%s$\"  1;\n" "$r_sub" "$r_key"
                 fi
             done < "$ROUTES_DATA"
         fi
@@ -84,10 +84,10 @@ regenerate_conf() {
         echo "map \$host \$lan_only {"
         echo "    default              0;"
         if [ -f "$ROUTES_DATA" ]; then
-            while IFS='|' read -r sub host port policy key lan_only; do
-                [ -z "$sub" ] && continue
-                if [ "$lan_only" = "1" ]; then
-                    printf "    ~^%s\\.              1;\n" "$sub"
+            while IFS='|' read -r r_sub r_host r_port r_policy r_key r_lan; do
+                [ -z "$r_sub" ] && continue
+                if [ "$r_lan" = "1" ]; then
+                    printf "    ~^%s\\.              1;\n" "$r_sub"
                 fi
             done < "$ROUTES_DATA"
         fi
