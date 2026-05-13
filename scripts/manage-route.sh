@@ -218,7 +218,7 @@ register_route() {
     fi
 
     touch "$ROUTES_DATA"
-    echo "${subdomain}|${host}|${port}|${policy}|${key}|1" >> "$ROUTES_DATA"
+    echo "${subdomain}|${host}|${port}|${policy}|${key}|0" >> "$ROUTES_DATA"
 
     regenerate_conf
     reload_nginx
@@ -226,7 +226,7 @@ register_route() {
     local domain="${DOMAIN:-shanbox.local}"
     local proto="https"
     local url_port=":8443"
-    printf '{"subdomain":"%s","host":"%s","port":%s,"policy":"%s","key":"%s","url":"%s://%s.%s%s","lan_only":true}\n' \
+    printf '{"subdomain":"%s","host":"%s","port":%s,"policy":"%s","key":"%s","url":"%s://%s.%s%s","lan_only":false}\n' \
         "$subdomain" "${host:-127.0.0.1}" "$port" "$policy" "$key" "$proto" "$subdomain" "$domain" "$url_port"
 }
 
