@@ -74,7 +74,7 @@ case "$METHOD" in
                     ADDR_PORT="$ADDRESS"
                 fi
 
-                if echo "$ADDR_HOST" | grep -qiE '^(127\.|localhost)$' || [ -z "$ADDR_HOST" ]; then
+                if echo "$ADDR_HOST" | grep -qiE '^127\.' || [ "$ADDR_HOST" = "localhost" ] || [ -z "$ADDR_HOST" ]; then
                     if [ -n "$CALLER_IP" ]; then
                         ADDRESS="${CALLER_IP}:${ADDR_PORT}"
                     else

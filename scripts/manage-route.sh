@@ -192,7 +192,7 @@ register_route() {
         port="$address"
     fi
 
-    if echo "$host" | grep -qiE '^(127\.|localhost)$'; then
+    if echo "$host" | grep -qiE '^127\.' || [ "$host" = "localhost" ]; then
         CLIENT_IP=$(echo "$SSH_CONNECTION" | awk '{print $1}')
         if [ -n "$CLIENT_IP" ]; then
             host="$CLIENT_IP"
