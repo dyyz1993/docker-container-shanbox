@@ -192,6 +192,16 @@ register_route() {
         port="$address"
     fi
 
+    if echo "$host" | grep -qiE '^(127\.|localhost)$'; then
+        CLIENT_IP=$(echo "$SSH_CONNECTION" | awk '{print $1}')
+        if [ -n "$CLIENT_IP" ]; then
+            host="$CLIENT_IP"
+        else
+            echo "Warning: 127.0.0.1/localhost inside container points to itself. Specify the real LAN IP or use the API (auto-detects caller IP)." >&2
+            return 1
+        fi
+    fi
+
     if ! echo "$port" | grep -qE '^[0-9]+$' || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
         echo "Invalid port: $port (must be 1-65535)" >&2
         return 1
