@@ -82,7 +82,7 @@ jobs:
           # ==============================================
           # Setup
           # ==============================================
-          mkdir -p /tmp/sb-data /tmp/sb-cfg
+          mkdir -p /tmp/sb-data /tmp/sb-cfg /tmp/sb-routes
           echo "persist-before-restart" > /tmp/sb-data/before.txt
           echo "shared-data.txt" > /tmp/sb-data/shared.txt
 
@@ -91,6 +91,7 @@ jobs:
             -e PUBLIC_IP="1.2.3.4" \
             -v /tmp/sb-data:/root/data \
             -v /tmp/sb-cfg:/etc/nginx/custom \
+            -v /tmp/sb-routes:/etc/nginx/routes.d \
             -p 2222:22 -p 8080:80 \
             "$IMAGE"
           sleep 8
@@ -102,26 +103,12 @@ jobs:
           # ==============================================
           # Setup routes & demo services
           # ==============================================
-          cat > /tmp/sb-cfg/routes.conf << 'ROUTES'
-          map $host $backend_port {
-              default              0;
-              ~^api\.              9001;
-              ~^web\.              9002;
-              ~^locked\.           9003;
-              ~^xapi\.             9004;
-          }
-
-          map $host $access_policy {
-              default              "public";
-              ~^api\.              "key";
-              ~^web\.              "public";
-              ~^locked\.           "private";
-              ~^xapi\.             "header";
-          }
-          ROUTES
-
-          docker exec e2ebox cp /etc/nginx/custom/routes.conf /etc/nginx/routes.d/default.conf
-          docker exec e2ebox nginx -t && docker exec e2ebox nginx -s reload
+          docker exec e2ebox bash /root/scripts/manage-route.sh add web 9002 public
+          ADD_API_OUT=$(docker exec e2ebox bash /root/scripts/manage-route.sh add api 9001 key)
+          API_KEY=$(echo "$ADD_API_OUT" | grep -o 'key=[a-z0-9]*' | cut -d= -f2)
+          echo "API key: $API_KEY"
+          docker exec e2ebox bash /root/scripts/manage-route.sh add locked 9003 private
+          docker exec e2ebox bash /root/scripts/manage-route.sh add xapi 9004 header
 
           # Start 4 demo HTTP backends in background
           docker exec -d e2ebox bash -c 'while true; do printf "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 18\r\n\r\n{\"svc\":\"api\"}" | nc -l -p 9001 -q 0; done'
@@ -154,7 +141,7 @@ jobs:
           # [3] key provided → 200
           # ==============================================
           echo "=== [3/15] key auth: provided → expect 200 ==="
-          $KCURL -H "Host: api.example.com" "http://localhost:8080/?key=mysecret" | grep -q "api" \
+          $KCURL -H "Host: api.example.com" "http://localhost:8080/?key=$API_KEY" | grep -q "api" \
             && echo "PASS" || { echo "FAIL"; ((FAIL++)); }
 
           # ==============================================
@@ -275,7 +262,7 @@ jobs:
           # Cleanup
           # ==============================================
           docker stop e2ebox && docker rm e2ebox
-          rm -rf /tmp/sb-data /tmp/sb-cfg
+          rm -rf /tmp/sb-data /tmp/sb-cfg /tmp/sb-routes
 
           echo ""
           echo "============================================"
