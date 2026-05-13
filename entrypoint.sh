@@ -47,18 +47,11 @@ envsubst '${PUBLIC_IP} ${DOMAIN}' \
 # ==========================================
 # 4. Routes config
 # ==========================================
-if [ -f /etc/nginx/custom/routes.conf ]; then
-    cp /etc/nginx/custom/routes.conf /etc/nginx/routes.d/default.conf
+if [ -f /etc/nginx/routes.d/routes.data ] && [ -s /etc/nginx/routes.d/routes.data ]; then
+    bash /root/scripts/manage-route.sh _regenerate
 elif [ ! -f /etc/nginx/routes.d/default.conf ]; then
-    cat > /etc/nginx/routes.d/default.conf << 'NGINXEOF'
-map $host $backend_port {
-    default              0;
-}
-
-map $host $access_policy {
-    default              "public";
-}
-NGINXEOF
+    touch /etc/nginx/routes.d/routes.data
+    bash /root/scripts/manage-route.sh _regenerate
 fi
 
 # ==========================================

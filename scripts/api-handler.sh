@@ -46,27 +46,49 @@ case "$METHOD" in
         esac
         ;;
     POST)
-        if [ "$PATH_PART" = "/api/routes" ]; then
-            SUBDOMAIN=$(echo "$BODY" | sed -n 's/.*"subdomain"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-            PORT=$(echo "$BODY" | sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
-            POLICY=$(echo "$BODY" | sed -n 's/.*"policy"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-            [ -z "$POLICY" ] && POLICY="public"
+        case "$PATH_PART" in
+            /api/register)
+                ADDRESS=$(echo "$BODY" | sed -n 's/.*"address"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                NAME=$(echo "$BODY" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                POLICY=$(echo "$BODY" | sed -n 's/.*"policy"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 
-            if [ -z "$SUBDOMAIN" ] || [ -z "$PORT" ]; then
-                respond "400 Bad Request" "application/json" '{"error":"subdomain and port are required"}'
-                exit 0
-            fi
+                if [ -z "$ADDRESS" ]; then
+                    respond "400 Bad Request" "application/json" '{"error":"address is required (host:port or port)"}'
+                    exit 0
+                fi
 
-            OUTPUT=$($ROUTES_SCRIPT add "$SUBDOMAIN" "$PORT" "$POLICY" 2>&1)
-            EXIT_CODE=$?
-            if [ $EXIT_CODE -eq 0 ]; then
-                respond "201 Created" "application/json" "{\"message\":\"route added\",\"subdomain\":\"$SUBDOMAIN\",\"port\":$PORT,\"policy\":\"$POLICY\"}"
-            else
-                respond "409 Conflict" "application/json" "{\"error\":\"$OUTPUT\"}"
-            fi
-        else
-            respond "404 Not Found" "application/json" '{"error":"not found"}'
-        fi
+                OUTPUT=$($ROUTES_SCRIPT register "$ADDRESS" "$NAME" "$POLICY" 2>&1)
+                EXIT_CODE=$?
+                if [ $EXIT_CODE -eq 0 ]; then
+                    respond "201 Created" "application/json" "$OUTPUT"
+                else
+                    respond "409 Conflict" "application/json" "{\"error\":\"$OUTPUT\"}"
+                fi
+                ;;
+            /api/routes)
+                SUBDOMAIN=$(echo "$BODY" | sed -n 's/.*"subdomain"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                PORT=$(echo "$BODY" | sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
+                POLICY=$(echo "$BODY" | sed -n 's/.*"policy"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                HOST=$(echo "$BODY" | sed -n 's/.*"host"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                [ -z "$POLICY" ] && POLICY="public"
+
+                if [ -z "$SUBDOMAIN" ] || [ -z "$PORT" ]; then
+                    respond "400 Bad Request" "application/json" '{"error":"subdomain and port are required"}'
+                    exit 0
+                fi
+
+                OUTPUT=$($ROUTES_SCRIPT add "$SUBDOMAIN" "$PORT" "$POLICY" "$HOST" 2>&1)
+                EXIT_CODE=$?
+                if [ $EXIT_CODE -eq 0 ]; then
+                    respond "201 Created" "application/json" "{\"message\":\"route added\",\"subdomain\":\"$SUBDOMAIN\",\"port\":$PORT,\"policy\":\"$POLICY\"}"
+                else
+                    respond "409 Conflict" "application/json" "{\"error\":\"$OUTPUT\"}"
+                fi
+                ;;
+            *)
+                respond "404 Not Found" "application/json" '{"error":"not found"}'
+                ;;
+        esac
         ;;
     DELETE)
         case "$PATH_PART" in

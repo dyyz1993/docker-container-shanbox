@@ -15,5 +15,6 @@ services:
       - ./scripts:/root/scripts
       - ./data:/root/data
       - ./logs:/var/log
+      - ./routes:/etc/nginx/routes.d
     env_file:
       - .env
