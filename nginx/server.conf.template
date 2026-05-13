@@ -6,6 +6,9 @@ server {
 
     client_max_body_size 1024M;
     error_page 498 = @need_auth;
+    error_page 502 = @backend_error;
+    error_page 503 = @backend_error;
+    error_page 504 = @backend_error;
 
     set $admin_deny 0;
     if ($http_x_real_ip !~ ^(10\.|192\.168\.|127\.)) { set $admin_deny 1; }
@@ -88,5 +91,10 @@ server {
         }
         default_type application/json;
         return 401 '{"error":"unauthorized","message":"authentication required"}';
+    }
+
+    location @backend_error {
+        default_type application/json;
+        return 502 '{"error":"backend_unreachable","message":"the backend service is not responding. it may be down or the port is not listening."}';
     }
 }
