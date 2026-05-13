@@ -34,6 +34,7 @@ server {
         if ($is_local = 1)              { set $lan_blocked "0"; }
         if ($is_real_local = 1)         { set $lan_blocked "0"; }
         if ($is_peer  = 1)              { set $lan_blocked "0"; }
+        if ($remote_addr ~ ^10\.)       { set $lan_blocked "0"; }
         if ($lan_blocked = "1")         { return 403; }
 
         set $auth_key_fail "0";
