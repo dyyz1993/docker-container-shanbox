@@ -102,9 +102,25 @@ cat > /etc/motd << MOTDEOF
 
   Policies: public | key | header | private
 
-  Current routes: ${ROUTE_COUNT}
   Domain: *.${DOMAIN}
 MOTDEOF
+
+if [ -f "$ROUTES_DATA" ] && [ -s "$ROUTES_DATA" ]; then
+    echo "" >> /etc/motd
+    echo "  Active Routes:" >> /etc/motd
+    echo "  ─────────────────────────────────────────────────" >> /etc/motd
+    printf "  %-12s %-20s %-8s %-8s %s\n" "SUBDOMAIN" "UPSTREAM" "PORT" "POLICY" "KEY" >> /etc/motd
+    while IFS='|' read -r r_sub r_host r_port r_policy r_key r_lan; do
+        [ -z "$r_sub" ] && continue
+        r_key_display="${r_key:-(none)}"
+        [ ${#r_key_display} -gt 8 ] && r_key_display="${r_key_display:0:8}..."
+        printf "  %-12s %-20s %-8s %-8s %s\n" "$r_sub" "${r_host:-127.0.0.1}" "$r_port" "$r_policy" "$r_key_display" >> /etc/motd
+    done < "$ROUTES_DATA"
+    echo "  ─────────────────────────────────────────────────" >> /etc/motd
+    echo "  Total: ${ROUTE_COUNT} routes" >> /etc/motd
+fi
+
+echo "" >> /etc/motd
 
 # ==========================================
 # 7. Validate & Start
