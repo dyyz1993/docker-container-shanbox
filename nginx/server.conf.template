@@ -32,6 +32,15 @@ server {
     }
 
     location / {
+        add_header Access-Control-Allow-Origin * always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "*" always;
+        add_header Access-Control-Max-Age 86400 always;
+
+        if ($request_method = OPTIONS) {
+            return 204;
+        }
+
         set $lan_blocked "0";
         if ($lan_only = 1)              { set $lan_blocked "1"; }
         if ($is_local = 1)              { set $lan_blocked "0"; }
@@ -82,6 +91,10 @@ server {
     }
 
     location @need_auth {
+        add_header Access-Control-Allow-Origin * always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "*" always;
+
         set $ext_proto $scheme;
         set $ext_port "";
         if ($http_x_forwarded_proto) { set $ext_proto $http_x_forwarded_proto; }
@@ -94,6 +107,7 @@ server {
     }
 
     location @backend_error {
+        add_header Access-Control-Allow-Origin * always;
         default_type application/json;
         return 502 '{"error":"backend_unreachable","message":"the backend service is not responding. it may be down or the port is not listening."}';
     }
