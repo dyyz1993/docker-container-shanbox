@@ -94,13 +94,18 @@ cat > /etc/motd << MOTDEOF
     manage-route.sh add <subdomain> <port> [policy] [host]
     manage-route.sh remove <subdomain>
     manage-route.sh list
+    manage-route.sh status              (check backend health)
+    manage-route.sh prune <seconds>     (remove routes older than N seconds)
 
   API (LAN only):
-    POST   /__api__/register   {"address":"192.168.0.4:3000"}
+    POST   /__api__/register   {"address":"host:port", "policy":"public"}
+                               (auto-dedup: same host:port returns existing route)
     GET    /__api__/routes
+    GET    /__api__/routes/status        (with backend health)
     DELETE /__api__/routes/<subdomain>
 
-  Policies: public | key | header | private
+  Policies: public | key (default) | header | private
+  Dedup:    same host:port reuses existing subdomain (200 + duplicated:true)
 
   Domain: *.${DOMAIN}
 MOTDEOF
@@ -109,12 +114,16 @@ if [ -f "$ROUTES_DATA" ] && [ -s "$ROUTES_DATA" ]; then
     echo "" >> /etc/motd
     echo "  Active Routes:" >> /etc/motd
     echo "  ─────────────────────────────────────────────────" >> /etc/motd
-    printf "  %-12s %-20s %-8s %-8s %s\n" "SUBDOMAIN" "UPSTREAM" "PORT" "POLICY" "KEY" >> /etc/motd
-    while IFS='|' read -r r_sub r_host r_port r_policy r_key r_lan; do
+    printf "  %-12s %-20s %-8s %-8s %-10s %s\n" "SUBDOMAIN" "UPSTREAM" "PORT" "POLICY" "KEY" "CREATED" >> /etc/motd
+    while IFS='|' read -r r_sub r_host r_port r_policy r_key r_lan r_created; do
         [ -z "$r_sub" ] && continue
         r_key_display="${r_key:-(none)}"
         [ ${#r_key_display} -gt 8 ] && r_key_display="${r_key_display:0:8}..."
-        printf "  %-12s %-20s %-8s %-8s %s\n" "$r_sub" "${r_host:-127.0.0.1}" "$r_port" "$r_policy" "$r_key_display" >> /etc/motd
+        r_ts=""
+        if [ -n "$r_created" ] && [ "$r_created" != "0" ]; then
+            r_ts=$(date -d "@$r_created" '+%m-%d %H:%M' 2>/dev/null || echo "")
+        fi
+        printf "  %-12s %-20s %-8s %-8s %-10s %s\n" "$r_sub" "${r_host:-127.0.0.1}" "$r_port" "$r_policy" "$r_key_display" "$r_ts" >> /etc/motd
     done < "$ROUTES_DATA"
     echo "  ─────────────────────────────────────────────────" >> /etc/motd
     echo "  Total: ${ROUTE_COUNT} routes" >> /etc/motd
