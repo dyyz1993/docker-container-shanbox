@@ -87,25 +87,98 @@ cat > /etc/motd << MOTDEOF
     Routes config /etc/nginx/routes.d/default.conf
     Scripts       /root/scripts/
     Data          /root/data/
-    Logs          /var/log/
+    Logs          /var/log/nginx/
 
-  CLI Usage:
-    manage-route.sh register <host:port> [name] [policy]
-    manage-route.sh add <subdomain> <port> [policy] [host]
-    manage-route.sh remove <subdomain>
-    manage-route.sh list
-    manage-route.sh status              (check backend health)
-    manage-route.sh prune <seconds>     (remove routes older than N seconds)
+  ┌─────────────────────────────────────────────┐
+  │  CLI Usage                                  │
+  └─────────────────────────────────────────────┘
 
-  API (LAN only):
-    POST   /__api__/register   {"address":"host:port", "policy":"public"}
-                               (auto-dedup: same host:port returns existing route)
-    GET    /__api__/routes
-    GET    /__api__/routes/status        (with backend health)
-    DELETE /__api__/routes/<subdomain>
+  register - auto-register a LAN service
+    /root/scripts/manage-route.sh register <host:port> [name] [policy]
 
-  Policies: public | key (default) | header | private
-  Dedup:    same host:port reuses existing subdomain (200 + duplicated:true)
+    Examples:
+      /root/scripts/manage-route.sh register 192.168.0.4:3000
+      /root/scripts/manage-route.sh register 192.168.0.4:5173 myapp public
+      /root/scripts/manage-route.sh register 3000              # auto-detect caller IP
+
+    Behavior:
+      - Same host:port already exists  -> return existing route (no duplicate)
+      - Policy changed                 -> update existing route
+      - New host:port                  -> create new route with random subdomain
+      - name provided                  -> use as subdomain instead of random
+
+  add - manually add route by subdomain
+    /root/scripts/manage-route.sh add <subdomain> <port> [policy] [host]
+
+    Examples:
+      /root/scripts/manage-route.sh add myapp 3000 public
+      /root/scripts/manage-route.sh add api 8080 key 192.168.0.5
+
+  remove - delete a route
+    /root/scripts/manage-route.sh remove <subdomain>
+
+  list / status - view routes
+    /root/scripts/manage-route.sh list       # table format
+    /root/scripts/manage-route.sh status     # with backend health check
+
+  prune - remove old routes
+    /root/scripts/manage-route.sh prune <seconds>
+
+    Examples:
+      /root/scripts/manage-route.sh prune 86400    # remove routes older than 1 day
+      /root/scripts/manage-route.sh prune 3600     # remove routes older than 1 hour
+
+  ┌─────────────────────────────────────────────┐
+  │  API (LAN only: /__api__/)                  │
+  └─────────────────────────────────────────────┘
+
+  POST /__api__/register  - register a service
+    curl -X POST http://shanbox/__api__/register \\
+      -H "Content-Type: application/json" \\
+      -d '{"address":"192.168.0.4:3000","policy":"public"}'
+    curl -X POST http://shanbox/__api__/register \\
+      -d '{"address":"192.168.0.4:5173","name":"myapp","policy":"public"}'
+    curl -X POST http://shanbox/__api__/register \\
+      -d '{"port":3000,"policy":"key"}'            # auto-detect caller IP
+
+    Response (new):
+      201 {"subdomain":"abc123","url":"https://abc123.${DOMAIN}:8443",...}
+    Response (duplicate):
+      200 {"subdomain":"abc123","duplicated":true,"updated":false,...}
+    Response (policy changed):
+      200 {"subdomain":"abc123","duplicated":true,"updated":true,...}
+
+  POST /__api__/routes    - add route manually
+    curl -X POST http://shanbox/__api__/routes \\
+      -d '{"subdomain":"myapp","port":3000,"policy":"public"}'
+
+  GET  /__api__/routes    - list all routes (JSON)
+  GET  /__api__/routes/status - list with backend health
+
+  DELETE /__api__/routes/<subdomain> - remove route
+    curl -X DELETE http://shanbox/__api__/routes/myapp
+
+  ┌─────────────────────────────────────────────┐
+  │  Access Policies                            │
+  └─────────────────────────────────────────────┘
+
+    public   - no authentication required
+    key      - requires ?key=xxx URL parameter
+    header   - requires X-Auth-Token header
+    private  - only LAN/whitelist IPs can access
+
+    Default policy for register: key
+    Auth bypass: LAN IPs (10.x, 192.168.x, 127.x) and PUBLIC_IP always skip auth
+
+  ┌─────────────────────────────────────────────┐
+  │  Features                                   │
+  └─────────────────────────────────────────────┘
+
+    CORS:       enabled globally (Access-Control-Allow-Origin: *)
+    WebSocket:  supported (Upgrade/Connection proxy, 24h timeout)
+    Dedup:      same host:port reuses existing subdomain
+    Auto-detect:127.0.0.1/localhost in address -> replaced with caller IP
+    Health:     manage-route.sh status checks if backend port is listening
 
   Domain: *.${DOMAIN}
 MOTDEOF
