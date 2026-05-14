@@ -86,7 +86,11 @@ case "$METHOD" in
                 OUTPUT=$($ROUTES_SCRIPT register "$ADDRESS" "$NAME" "$POLICY" 2>&1)
                 EXIT_CODE=$?
                 if [ $EXIT_CODE -eq 0 ]; then
-                    respond "201 Created" "application/json" "$OUTPUT"
+                    if echo "$OUTPUT" | grep -q '"duplicated":true'; then
+                        respond "200 OK" "application/json" "$OUTPUT"
+                    else
+                        respond "201 Created" "application/json" "$OUTPUT"
+                    fi
                 else
                     respond "409 Conflict" "application/json" "{\"error\":\"$OUTPUT\"}"
                 fi
