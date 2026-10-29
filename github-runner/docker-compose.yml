@@ -22,6 +22,8 @@ services:
       - go-mod-cache:/home/runner/go
       - go-build-cache:/home/runner/.cache/go-build
       - dind-data:/var/lib/docker # dind 镜像缓存，重启不丢
+      - playwright-cache:/home/runner/.cache/ms-playwright # 浏览器按版本缓存，每个版本只下一次
+      - pnpm-store:/home/runner/.local/share/pnpm # pnpm 包存储跨 job 复用
       - tools:/opt/tools # 外挂卷：Android SDK + Flutter 懒加载，跨镜像更新存活（两实例共享一份）
     # 不映射任何端口：runner 是出站长轮询连 GitHub，NAS 在内网即可
 
@@ -34,6 +36,8 @@ volumes:
   go-mod-cache:
   go-build-cache:
   dind-data:
+  playwright-cache:
+  pnpm-store:
   tools:
     external: true
     name: gha-tools
