@@ -53,9 +53,9 @@ RUNNER_NAME="${RUNNER_NAME:-$(hostname)}"
 RUNNER_LABELS="${RUNNER_LABELS:-nas}"
 
 # ephemeral：彻底清掉上一次生命周期残留（异常退出会留下 .runner/.credentials 尸体，
-# 导致 restart 后 "already configured" 拒绝重注册）
-rm -rf _work .credentials .credentials_rsauthtool .runner _diag
-mkdir -p _work
+# 导致 restart 后 "already configured" 拒绝重注册）。用绝对路径——restart 时 cwd/HOME 不保证
+rm -rf "$RUNNER_HOME"/_work "$RUNNER_HOME"/.credentials* "$RUNNER_HOME"/.runner "$RUNNER_HOME"/_diag
+mkdir -p "$RUNNER_HOME"/_work
 
 # registration token：按 URL 形态自动识别 org 级 / 仓库级
 path="${RUNNER_URL#*://}"
