@@ -14,7 +14,10 @@ log() { echo "[entrypoint] $(date '+%F %T') $*"; }
 if [[ "$(id -u)" -eq 0 ]]; then
   # ---------- 阶段一 ----------
   log "starting dockerd..."
-  rm -f /var/run/docker.sock
+  # restart 场景：等旧 dockerd 退净再清残留 pid/socket，避免 "process with PID N is still running"
+  for i in $(seq 1 15); do pgrep -x dockerd >/dev/null || break; sleep 1; done
+  pkill -9 -x dockerd 2>/dev/null || true
+  rm -f /var/run/docker.sock /var/run/docker.pid
   nohup dockerd --storage-driver=overlay2 >"$DOCKER_LOG" 2>&1 &
   for i in $(seq 1 60); do
     docker info >/dev/null 2>&1 && break
