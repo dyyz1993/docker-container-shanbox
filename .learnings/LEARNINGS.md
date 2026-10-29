@@ -27,3 +27,29 @@
 - Recurrence-Count: 1
 
 ---
+## [LRN-20261029-002] correction
+
+**Logged**: 2026-10-29T12:15:00Z
+**Priority**: critical
+**Status**: resolved
+**Area**: infra
+
+### Summary
+用户制止：未经确认在用户 Mac 上启动 OrbStack 并跑 docker pull。用户 Mac 不做任何工作负载/守护进程启动，除非明确要求。
+
+### Details
+为加速 NAS 拉镜像，自行 open -a OrbStack 在 Mac 拉镜像。用户："你怎么在我的机器上去跑这个Docker呢？我不希望。" 已即时停止：删镜像、prune、退出 OrbStack 恢复原状。用户随后给出正解：用国内 registry 镜像前缀（NAS 已在用 docker.unsee.tech 等）加速 ghcr 拉取。
+
+### Suggested Action
+1. 用户 Mac 只做开发/校验（bash -n、compose config），不起 daemon、不跑容器、不拉镜像
+2. 遇到国内拉取慢：优先 registry 镜像前缀方案（docker.m.daocloud.io/ghcr.io/...、ghcr.nju.edu.cn/... 等），多在 NAS 上探活再选路
+
+### Metadata
+- Source: user_feedback
+- Related Files: /tmp/gha-pull-watch.sh
+- Tags: mac, boundary, docker, mirror
+- First-Seen: 2026-10-29
+- Last-Seen: 2026-10-29
+- Recurrence-Count: 1
+
+---

@@ -68,6 +68,7 @@ docker compose -p gha2 --env-file .env2 up -d
 - **公开仓库红线**：自托管 runner 绝不能服务 public repo（PR 恶意代码 = 拿到你的环境）。
   org runner group 默认仅私有仓库可见，不要改公开。
 - **镜像更新**：workflow 每月 1 号自动跟进 actions/runner 新版本；NAS 上 `docker compose pull && up -d`。
+  ⚠️ 若仓库里的 docker-compose.yml 也有更新（如端口、卷），先重新 curl 覆盖 NAS 上的 compose 再 up，否则改动不生效。
 - **--ephemeral**：一个 runner 只接一个 job，跑完自动注销、容器重启重新注册（`--replace` 清理同名旧注册）。
   NAS 断电重启后自动恢复，无需人工干预。
 - **磁盘**：镜像 ~10GB；`dind-data` 卷会随 CI 构建增长（镜像缓存被保留以加速），必要时
