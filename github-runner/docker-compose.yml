@@ -1,12 +1,11 @@
 name: gha
 
+# 极空间 NAS 上只拉取、不构建：镜像统一由 CI 构建推 GHCR（.github/workflows/build-gha-runner.yml）
+# 本地 Mac 调试需要自建镜像时：docker build -t gha-runner:local .
 services:
   runner:
     image: ${RUNNER_IMAGE:-ghcr.io/dyyz1993/gha-runner:latest}
-    build:
-      context: .
-      args:
-        RUNNER_VERSION: ${RUNNER_VERSION:-2.338.2}
+    hostname: gha-runner # 固定主机名：GitHub 侧 runner 名稳定，重建容器后 --replace 能清理旧注册
     restart: unless-stopped
     privileged: true # 内嵌 dockerd（dind）需要；与 NAS 宿主 Docker 完全隔离
     init: true

@@ -24,22 +24,34 @@ Go、Temurin JDK 17/21、Android SDK（build-tools 36）、Flutter stable、gh C
    仓库转入 org 后一次注册全生效；仓库 URL 变为 `github.com/<org>/<repo>`（本地 remote 需改）。
 2. **classic PAT**：org 级需 `admin:org`；仓库级需 `repo`。（Settings → Developer settings → PAT）
 
-## 部署
+## 部署（极空间 Z4Pro，只拉不建）
+
+> NAS 约束：极空间上**只能拉取镜像，不能构建**。镜像统一由 CI 构建（见下"镜像构建"），NAS 端 compose 无 `build:` 段。
+> 实测环境（2026-10-29）：Z4Pro-O017 / x86_64 / Docker 26.1.4 / compose v2.21.0 / docker root `/data_n001/data/udata/real/zdocker`。
 
 ```bash
-# Mac 上首次：push 本仓库触发 .github/workflows/build-gha-runner.yml 构建镜像（约 30 分钟）
+# 前置：镜像已由 CI 构建推 GHCR，且为 public（匿名可拉，无需 docker login）
 
-# NAS 上（ssh 进极空间）：
-mkdir -p ~/docker/github-runner && cd ~/docker/github-runner
-# 把本目录 4 个文件 + .env.example 拷上来，然后：
-cp .env.example .env   # 填 RUNNER_URL + GITHUB_TOKEN
-docker login ghcr.io -u dyyz1993 -p <PAT(read:packages)>   # GHCR 包默认私有；或首次推送后在 GitHub 把包设为 public 跳过登录
-docker compose pull
-docker compose up -d
+# 1. ssh jkj 进 NAS，按 shanbox 同款惯例建项目目录
+mkdir -p /data/docker/github-runner && cd /data/docker/github-runner
+
+# 2. 取 compose 与配置模板
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/dyyz1993/docker-container-shanbox/master/github-runner/docker-compose.yml
+curl -fsSL -o .env.example     https://raw.githubusercontent.com/dyyz1993/docker-container-shanbox/master/github-runner/.env.example
+
+# 3. 填配置后启动
+cp .env.example .env && vim .env   # 填 RUNNER_URL + GITHUB_TOKEN（classic PAT：org 级 admin:org / 仓库级 repo）
+docker compose pull && docker compose up -d
 ```
+
+（也可放进 dockge 面板管理：栈目录 `/data/docker/dockge/stacks/github-runner/`，粘贴同一份 compose + .env 即可。）
 
 验证：GitHub 仓库/组织 → Settings → Actions → Runners 出现 `gha-runner-1`（Idle）。
 workflow 里 `runs-on: [self-hosted, nas]` 即可路由到它（`nas` 标签在 `.env` 里配）。
+
+### 磁盘注意
+
+NAS 数据盘当前已用 **91%**（余 165G）。本镜像压缩后约 4.5~5G，解压 + dind 缓存卷会继续增长，留意清理（见下"注意事项"）。
 
 ## 并发扩容
 
