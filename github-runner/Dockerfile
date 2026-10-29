@@ -103,7 +103,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssh-server 
   && echo 'runner ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/runner && chmod 0440 /etc/sudoers.d/runner \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ---------- 国内镜像源（NAS 上跑 CI job 时生效：Go/Flutter 官方中国镜像；对 GitHub 构建机无影响）----------
+# ---------- 国内镜像源（NAS 上跑 CI job 时生效；对 GitHub 构建机无影响）----------
+# npm/pnpm：全局 .npmrc 指向 npmmirror——lockfile 已锁 resolved URL 的仍走原源（一致性不受影响），
+# 未锁的包、npm 全局包、pnpm store 走镜像
+RUN mkdir -p /home/runner/.config && \
+    printf 'registry=https://registry.npmmirror.com\n' > /home/runner/.npmrc && \
+    printf 'registry=https://registry.npmmirror.com\n' > /home/runner/.config/npm/rc && \
+    chown -R runner:runner /home/runner/.npmrc /home/runner/.config
+
 ENV GOPROXY=https://goproxy.cn,direct \
     PUB_HOSTED_URL=https://pub.flutter-io.cn \
     FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn \
