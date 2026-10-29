@@ -62,27 +62,13 @@ RUN curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 ENV JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64
 
-# ---------- Android SDK ----------
-ARG ANDROID_CMDLINE_TOOLS_VERSION=11076708
-ARG ANDROID_BUILD_TOOLS=36.0.0
-ARG ANDROID_PLATFORM=android-36
-ENV ANDROID_HOME=/opt/android-sdk
-RUN curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_CMDLINE_TOOLS_VERSION}_latest.zip" -o /tmp/cmdline-tools.zip \
-  && unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools \
-  && mkdir -p ${ANDROID_HOME}/cmdline-tools \
-  && mv /tmp/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest \
-  && rm /tmp/cmdline-tools.zip \
-  && (yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} --licenses > /dev/null || true) \
-  && ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} \
-      "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;${ANDROID_BUILD_TOOLS}" > /dev/null \
-  && chown -R runner:runner ${ANDROID_HOME}
-ENV PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:$PATH
-
-# ---------- Flutter stable ----------
-ARG FLUTTER_VERSION=3.47.8
-RUN curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" | tar -C /opt -xJ \
-  && chown -R runner:runner /opt/flutter
-ENV PATH=/opt/flutter/bin:$PATH
+# ---------- Android SDK + Flutter：外挂懒加载 ----------
+# 不打进镜像：bootstrap-tools.sh 首次启动时装到 /opt/tools 外挂卷（国内源、跨镜像更新存活）
+ENV ANDROID_HOME=/opt/tools/android-sdk \
+    ANDROID_BUILD_TOOLS=36.0.0 \
+    ANDROID_PLATFORM=android-36 \
+    FLUTTER_VERSION=3.47.8
+ENV PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:/opt/tools/flutter/bin:$PATH
 
 # ---------- GitHub Actions runner本体 ----------
 ARG RUNNER_VERSION=2.338.2
@@ -100,18 +86,14 @@ RUN mkdir -p ${RUNNER_HOME}/_work ${RUNNER_HOME}/.gradle ${RUNNER_HOME}/.m2 \
       ${RUNNER_HOME}/.cache/go-build ${RUNNER_HOME}/go \
   && chown -R runner:runner ${RUNNER_HOME}
 
-# ---------- 冒烟验证 ----------
+# ---------- 冒烟验证（轻量版：外挂工具链不在镜像内，不在此验证）----------
 USER runner
-RUN flutter config --no-analytics >/dev/null \
-  && flutter precache --android \
-  && git config --global --add safe.directory /opt/flutter \
-  && node --version && npm --version \
+RUN node --version && npm --version \
   && python3 --version && uv --version \
   && go version \
   && java -version \
-  && sdkmanager --sdk_root=${ANDROID_HOME} --list_installed | head -5 \
-  && flutter --version \
-  && docker --version
+  && docker --version \
+  && gh --version | head -1
 
 # ---------- SSH 调试入口 + runner 免密 sudo（对齐托管 runner 行为，Playwright --with-deps 等需要）----------
 USER root
@@ -129,6 +111,7 @@ ENV GOPROXY=https://goproxy.cn,direct \
 
 USER root
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod 0755 /usr/local/bin/entrypoint.sh
+COPY bootstrap-tools.sh /usr/local/bin/bootstrap-tools.sh
+RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/bootstrap-tools.sh
 WORKDIR ${RUNNER_HOME}
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

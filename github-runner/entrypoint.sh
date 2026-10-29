@@ -26,6 +26,8 @@ if [[ "$(id -u)" -eq 0 ]]; then
     sleep 1
   done
   log "dockerd ready"
+  # 重工具链外挂引导（后台、幂等；Android SDK + Flutter 装到 /opt/tools 卷，日志 /tmp/bootstrap-tools.log）
+  nohup /usr/local/bin/bootstrap-tools.sh >/dev/null 2>&1 &
   # SSH 调试入口：注入公钥并拉起 sshd（仅密钥登录，密码已禁）
   if [[ -n "${SSH_PUBLIC_KEY:-}" ]]; then
     mkdir -p /root/.ssh && chmod 700 /root/.ssh

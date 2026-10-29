@@ -22,6 +22,7 @@ services:
       - go-mod-cache:/home/runner/go
       - go-build-cache:/home/runner/.cache/go-build
       - dind-data:/var/lib/docker # dind 镜像缓存，重启不丢
+      - tools:/opt/tools # 外挂卷：Android SDK + Flutter 懒加载，跨镜像更新存活（两实例共享一份）
     # 不映射任何端口：runner 是出站长轮询连 GitHub，NAS 在内网即可
 
 volumes:
@@ -33,3 +34,6 @@ volumes:
   go-mod-cache:
   go-build-cache:
   dind-data:
+  tools:
+    external: true
+    name: gha-tools
