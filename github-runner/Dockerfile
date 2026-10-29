@@ -113,7 +113,8 @@ RUN flutter config --no-analytics >/dev/null \
   && flutter --version \
   && docker --version
 
-# ---------- SSH 调试入口（独立层放在尾部：改动不击穿上方缓存层）----------
+# ---------- SSH 调试入口（独立层放在尾部：改动不击穿上方缓存层；须先回到 root，前层是 USER runner）----------
+USER root
 RUN apt-get update && apt-get install -y --no-install-recommends openssh-server \
   && mkdir -p /run/sshd /root/.ssh \
   && printf 'PasswordAuthentication no\nPermitRootLogin prohibit-password\n' > /etc/ssh/sshd_config.d/99-runner.conf \
