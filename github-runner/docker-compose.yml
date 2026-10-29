@@ -1,0 +1,34 @@
+name: gha
+
+services:
+  runner:
+    image: ${RUNNER_IMAGE:-ghcr.io/dyyz1993/gha-runner:latest}
+    build:
+      context: .
+      args:
+        RUNNER_VERSION: ${RUNNER_VERSION:-2.338.2}
+    restart: unless-stopped
+    privileged: true # 内嵌 dockerd（dind）需要；与 NAS 宿主 Docker 完全隔离
+    init: true
+    env_file:
+      - .env
+    volumes:
+      - gradle-cache:/home/runner/.gradle
+      - maven-cache:/home/runner/.m2
+      - npm-cache:/home/runner/.npm
+      - pub-cache:/home/runner/.pub-cache
+      - uv-cache:/home/runner/.cache/uv
+      - go-mod-cache:/home/runner/go
+      - go-build-cache:/home/runner/.cache/go-build
+      - dind-data:/var/lib/docker # dind 镜像缓存，重启不丢
+    # 不映射任何端口：runner 是出站长轮询连 GitHub，NAS 在内网即可
+
+volumes:
+  gradle-cache:
+  maven-cache:
+  npm-cache:
+  pub-cache:
+  uv-cache:
+  go-mod-cache:
+  go-build-cache:
+  dind-data:
