@@ -53,23 +53,35 @@ workflow 里 `runs-on: [self-hosted, nas]` 即可路由到它（`nas` 标签在 
 
 NAS 数据盘当前已用 **91%**（余 165G）。本镜像压缩后约 4.5~5G，解压 + dind 缓存卷会继续增长，留意清理（见下"注意事项"）。
 
-## 并发扩容
+## 并发扩容（多实例 = 每仓库一个实例）
 
-单实例同一时刻只跑 1 个 job。要 N 个并发（每个都有独立 dind + 独立缓存卷）：
+单实例同一时刻只跑 1 个 job。接新仓库：
 
 ```bash
-cp .env .env2   # 改 RUNNER_NAME=gha-runner-2（其余不动）
-docker compose -p gha2 --env-file .env2 up -d
+cd /data/docker/github-runner
+cp .env .env.<名字>
+# 改 RUNNER_URL（指向新仓库）、RUNNER_NAME（唯一）、SSH_PORT（唯一端口）
+# 必须加一行 ENV_FILE=.env.<名字> —— compose 同目录的 .env 会抢 env_file 变量优先级！
+echo "ENV_FILE=.env.<名字>" >> .env.<名字>
+docker compose -p <项目名> --env-file .env.<名字> up -d --force-recreate
 ```
+
+⚠️ 踩坑记录（详见项目 .learnings/）：
+- `--env-file` 只做变量替换，compose 里 `env_file:` 也要参数化（`ENV_FILE:-.env`），否则所有实例读到第一份配置
+- 改完 entrypoint 后验证镜像内文件与仓库一致（GHA 层缓存可能命中旧 COPY 层）
+- ephemeral 异常退出会在 `actions-runner/`（安装目录）留 `.runner`/`.credentials` 尸体，restart 前必须清理（entrypoint 已内置）
+- 修 restart 循环容器：`docker stop` → `docker cp` → `docker start`（循环中的容器 exec/cp 都会失败）
 
 ## 注意事项
 
 - **iOS/macOS 构建不行**：Linux 容器出不了 iOS 包；以后可在 Mac 上直接装一个 runner 用 label 区分。
 - **公开仓库红线**：自托管 runner 绝不能服务 public repo（PR 恶意代码 = 拿到你的环境）。
   org runner group 默认仅私有仓库可见，不要改公开。
-- **镜像更新**：workflow 每月 1 号自动跟进 actions/runner 新版本；NAS 上 `docker compose pull && up -d`。
-  ⚠️ 若仓库里的 docker-compose.yml 也有更新（如端口、卷），先重新 curl 覆盖 NAS 上的 compose 再 up，否则改动不生效。
+- **镜像更新**：NAS 上 `bash /data/docker/github-runner/auto-update.sh`（南大镜像源 + 8 轮断点重试 + 双实例滚动重启）。
+  workflow 每月 1 号自动构建新镜像；⚠️ 若仓库里的 docker-compose.yml 也有更新，先重新 curl 覆盖 NAS 上的 compose 再跑脚本。
 - **--ephemeral**：一个 runner 只接一个 job，跑完自动注销、容器重启重新注册（`--replace` 清理同名旧注册）。
   NAS 断电重启后自动恢复，无需人工干预。
-- **磁盘**：镜像 ~10GB；`dind-data` 卷会随 CI 构建增长（镜像缓存被保留以加速），必要时
-  `docker exec gha-runner-1 docker system prune -af` 清理（会牺牲镜像缓存速度）。
+- **磁盘**：镜像 ~3GB（工具链已外挂到 gha-tools 卷，~3GB）；`dind-data` 卷随 CI 构建增长（镜像缓存保留以加速），
+  必要时 `docker exec gha-runner-1 docker system prune -af` 清理。
+- **国内镜像源已内置**：GOPROXY/flutter-io.cn/npmmirror(playwright+node 分发)/npm registry 全局 .npmrc
+  （lockfile 已锁 resolved URL 的仍走原源，保证一致性）。
