@@ -27,11 +27,11 @@ RUN install -m 0755 -d /etc/apt/keyrings \
     docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ---------- gh CLI ----------
-RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages noble main" > /etc/apt/sources.list.d/github-cli.list \
-  && apt-get update && apt-get install -y --no-install-recommends gh \
-  && apt-get clean && rm -rf /var/lib/apt/lists/*
+# ---------- gh CLI（官方 apt 仓库无 noble 发行版，直装 .deb）----------
+ARG GH_VERSION=2.103.3
+RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.deb" -o /tmp/gh.deb \
+  && apt-get install -y /tmp/gh.deb \
+  && rm /tmp/gh.deb && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ---------- runner 用户 + docker 组（访问内嵌 daemon 的 socket）----------
 RUN useradd -m -u 1001 -s /bin/bash runner \
