@@ -12,7 +12,7 @@ services:
     ports:
       - "${SSH_PORT:-2202}:22" # SSH 调试入口（仅密钥）
     env_file:
-      - .env
+      - ${ENV_FILE:-.env} # 多实例：由 --env-file 传入的 ENV_FILE 指定各自配置（变量替换与容器 env 是两回事）
     volumes:
       - gradle-cache:/home/runner/.gradle
       - maven-cache:/home/runner/.m2
