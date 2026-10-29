@@ -121,6 +121,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssh-server 
   && echo 'runner ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/runner && chmod 0440 /etc/sudoers.d/runner \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# ---------- 国内镜像源（NAS 上跑 CI job 时生效：Go/Flutter 官方中国镜像；对 GitHub 构建机无影响）----------
+ENV GOPROXY=https://goproxy.cn,direct \
+    PUB_HOSTED_URL=https://pub.flutter-io.cn \
+    FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
+
 USER root
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod 0755 /usr/local/bin/entrypoint.sh
