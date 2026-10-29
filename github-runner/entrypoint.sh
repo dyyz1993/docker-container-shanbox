@@ -26,6 +26,13 @@ if [[ "$(id -u)" -eq 0 ]]; then
     sleep 1
   done
   log "dockerd ready"
+  # SSH 调试入口：注入公钥并拉起 sshd（仅密钥登录，密码已禁）
+  if [[ -n "${SSH_PUBLIC_KEY:-}" ]]; then
+    mkdir -p /root/.ssh && chmod 700 /root/.ssh
+    echo "$SSH_PUBLIC_KEY" > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys
+    /usr/sbin/sshd
+    log "sshd up (port 22 -> host mapped)"
+  fi
   # 切到 runner 用户进阶段二；--init-groups 保留 docker 组（socket 权限）
   exec setpriv --reuid=runner --regid=runner --init-groups bash "$0"
 fi

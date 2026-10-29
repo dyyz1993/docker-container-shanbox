@@ -113,6 +113,12 @@ RUN flutter config --no-analytics >/dev/null \
   && flutter --version \
   && docker --version
 
+# ---------- SSH 调试入口（独立层放在尾部：改动不击穿上方缓存层）----------
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-server \
+  && mkdir -p /run/sshd /root/.ssh \
+  && printf 'PasswordAuthentication no\nPermitRootLogin prohibit-password\n' > /etc/ssh/sshd_config.d/99-runner.conf \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 USER root
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod 0755 /usr/local/bin/entrypoint.sh

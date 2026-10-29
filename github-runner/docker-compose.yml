@@ -9,6 +9,8 @@ services:
     restart: unless-stopped
     privileged: true # 内嵌 dockerd（dind）需要；与 NAS 宿主 Docker 完全隔离
     init: true
+    ports:
+      - "${SSH_PORT:-2202}:22" # SSH 调试入口（仅密钥）
     env_file:
       - .env
     volumes:
