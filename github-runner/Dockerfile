@@ -124,7 +124,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssh-server 
 # ---------- 国内镜像源（NAS 上跑 CI job 时生效：Go/Flutter 官方中国镜像；对 GitHub 构建机无影响）----------
 ENV GOPROXY=https://goproxy.cn,direct \
     PUB_HOSTED_URL=https://pub.flutter-io.cn \
-    FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
+    FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn \
+    PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright
 
 USER root
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
