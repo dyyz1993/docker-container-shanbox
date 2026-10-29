@@ -52,9 +52,9 @@ cd "$RUNNER_HOME"
 RUNNER_NAME="${RUNNER_NAME:-$(hostname)}"
 RUNNER_LABELS="${RUNNER_LABELS:-nas}"
 
-# ephemeral：彻底清掉上一次生命周期残留（异常退出会留下 .runner/.credentials 尸体，
-# 导致 restart 后 "already configured" 拒绝重注册）。用绝对路径——restart 时 cwd/HOME 不保证
-rm -rf "$RUNNER_HOME"/_work "$RUNNER_HOME"/.credentials* "$RUNNER_HOME"/.runner "$RUNNER_HOME"/_diag
+# ephemeral：彻底清掉上一次生命周期残留。尸体在 RUNNER_DIR（actions-runner 安装目录，config.sh 的 cwd）
+# 和 RUNNER_HOME 两处都清——异常退出留下的 .runner/.credentials 会让 restart 后 "already configured"
+rm -rf "$RUNNER_HOME"/_work "$RUNNER_HOME"/_diag "$RUNNER_DIR"/.runner "$RUNNER_DIR"/.credentials* "$RUNNER_DIR"/_diag
 mkdir -p "$RUNNER_HOME"/_work
 
 # registration token：按 URL 形态自动识别 org 级 / 仓库级
