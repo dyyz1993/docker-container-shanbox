@@ -93,3 +93,58 @@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!
 - Last-Seen: 2026-10-29
 - Recurrence-Count: 3
 ---
+## [ERR-20261029-004] ephemeral-runner-restart-corpse-chain
+
+**Logged**: 2026-10-29T19:55:00Z
+**Priority**: high
+**Status**: resolved
+**Area**: infra
+
+### Summary
+ephemeral runner 容器 restart 后连环死锁 2 小时。四层根因叠加：(1) `docker restart` 不重建容器，异常退出留下的 `.runner`/`.credentials` 在 **RUNNER_DIR（actions-runner/ 安装目录）**而非 RUNNER_HOME，清理清错位置 → "already configured" 拒绝重注册 → set -e 退出 → restart 循环；(2) 循环容器无法 docker exec/docker cp（含 stdin 方式），热修极难；(3) compose 的 env_file 修复版未同步 NAS 前，多实例曾错注册到同一仓库互相踢会话；(4) 镜像 COPY 层缓存命中旧 entrypoint，force-recreate 拿到的还是旧逻辑。
+
+### Error
+```
+Cannot configure the runner because it is already configured.
+Error response from daemon: Container ... is restarting, wait until the container is running
+```
+
+### Suggested Fix
+1. 清理必须绝对路径且覆盖 RUNNER_DIR + RUNNER_HOME 两处（已修）
+2. 修循环容器：`docker stop`（非 restart）→ docker cp → `docker start`；docker cp 对运行中/循环容器会报 /proc/self/fd 错
+3. 多实例各自 ENV_FILE 写进自身 env 文件（防 compose 同目录 .env 抢优先级）
+4. 改 entrypoint 后必须验证镜像内文件 md5 与仓库一致（GHA 层缓存可能骗人）
+
+### Metadata
+- Reproducible: yes
+- See Also: ERR-20261029-002
+- First-Seen: 2026-10-29
+- Last-Seen: 2026-10-29
+- Recurrence-Count: 1
+---
+## [ERR-20261030-001] pnpm-version-dual-source
+
+**Logged**: 2026-10-31T00:10:00Z
+**Priority**: medium
+**Status**: resolved
+**Area**: infra
+
+### Summary
+pnpm/action-setup@v4 在 action input `version: 10` 与 package.json `packageManager: pnpm@12.16.1` 并存时报 ERR_PNPM_BAD_PM_VERSION，CI 三个 job 全挂。存量问题：旧 CI 从未跑到这一步（前置步骤先挂），NAS runner 首次让流水线跑深才暴露。
+
+### Error
+```
+Error: Multiple versions of pnpm specified:
+  - version 10 in the GitHub Action config with the key "version"
+  - version pnpm@12.16.1+sha512... in package.json "packageManager"
+```
+
+### Suggested Fix
+删掉 workflow 里的 `version: 10` 输入，以 package.json `packageManager` 字段为唯一权威版本源。另：commitlint 对 commit message 有 type-enum + subject ≤80 字符约束；husky pre-commit 需要完整 devDeps（lint-scripts 缺 glob 会让本地提交直接失败）。
+
+### Metadata
+- Reproducible: yes
+- Related Files: .github/workflows/ci.yml（xbrowser-marketplace 仓库）
+- First-Seen: 2026-10-30
+- Last-Seen: 2026-10-30
+---

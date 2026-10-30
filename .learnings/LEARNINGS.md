@@ -53,3 +53,53 @@
 - Recurrence-Count: 1
 
 ---
+## [LRN-20261029-002] best_practice
+
+**Logged**: 2026-10-29T17:05:00Z
+**Priority**: high
+**Status**: resolved
+**Area**: infra
+
+### Summary
+用户提议：重型/需额外下载的工具链用"外挂"进容器，别打进镜像——彻底避免每次镜像更新拉几个 GB。
+
+### Details
+gha-runner 镜像 6.4GB，大头是 Android SDK（~3GB）+ Flutter（~2GB）。且 CI 全量重建后层摘要全变，NAS 更新 = 重新下载全部层（晚高峰国际带宽下苦不堪言）。采纳用户方案：两个工具链移到共享外挂卷 gha-tools:/opt/tools，bootstrap-tools.sh 首启检测标记文件、从 dl.google.com（国内 CDN）+ storage.flutter-io.cn 懒加载安装，幂等、跨镜像更新存活、双实例共享一份。镜像瘦至 ~3GB，后续月度更新预计 100MB 级增量。
+
+### Suggested Action
+凡 >500MB 的工具链/数据集一律外挂卷 + 首启引导（幂等标记 + 国内源），镜像只留"不可变基础件"。
+
+### Metadata
+- Source: user_feedback
+- Related Files: github-runner/bootstrap-tools.sh, github-runner/docker-compose.yml
+- Tags: docker, image-size, lazy-bootstrap, mirror
+- First-Seen: 2026-10-29
+- Last-Seen: 2026-10-29
+- Recurrence-Count: 1
+
+---
+## [LRN-20261030-001] best_practice
+
+**Logged**: 2026-10-31T04:00:00Z
+**Priority**: medium
+**Status**: resolved
+**Area**: infra
+
+### Summary
+playwright 浏览器镜像源（npmmirror）收录滞后：新 playwright 版本（如 1208/Chrome for Testing 145）镜像源 404。全局 PLAYWRIGHT_DOWNLOAD_HOST 会卡死新版。
+
+### Details
+xbrowser-marketplace e2e：npm registry 走 npmmirror 后，playwright install 404（cdn.npmmirror.com/binaries/playwright 最高收录 1243 之前的 build；1208 的 chrome-for-testing 变体不存在）。对策：该 install 步骤局部 `PLAYWRIGHT_DOWNLOAD_HOST: ""` 回官方 CDN，其余照旧。另：playwright-cache 卷首用前需 chown 1001（默认 root 属主致 __dirlock EACCES）。
+
+### Suggested Action
+镜像源只用于"确认收录"的资源；版本敏感的二进制分发（playwright browsers）要么锁版本、要么局部回官方源。
+
+### Metadata
+- Source: conversation
+- Related Files: /tmp/xm-trigger/.github/workflows/ci.yml
+- Tags: playwright, mirror, npmmirror, e2e
+- First-Seen: 2026-10-30
+- Last-Seen: 2026-10-30
+- Recurrence-Count: 1
+
+---
