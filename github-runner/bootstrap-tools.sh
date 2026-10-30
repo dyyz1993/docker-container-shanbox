@@ -42,6 +42,7 @@ if [[ ! -f "$FLUTTER_DIR/ok" ]]; then
      && tar -xJf "$T/f.tar.xz" -C "$TOOLS" && rm -rf "$T"; then
     echo "$FLUTTER_VERSION" > "$FLUTTER_DIR/ok"
     chown -R 1001:1001 "$FLUTTER_DIR"
+    git config --system --add safe.directory "$FLUTTER_DIR"
     log "Flutter extracted; precache android artifacts"
     HOME="$TOOLS" git config --global --add safe.directory "$FLUTTER_DIR" 2>/dev/null || true
     sudo -u \#1001 env HOME=/home/runner PUB_CACHE=/home/runner/.pub-cache \
