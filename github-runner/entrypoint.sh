@@ -29,6 +29,8 @@ if [[ "$(id -u)" -eq 0 ]]; then
     sleep 1
   done
   log "dockerd ready"
+  # 出站代理（mihomo 一倍率节点池，github/ghcr/内网直连）——失败不阻塞主流程
+  bash /usr/local/bin/proxy-setup.sh 2>/dev/null || true
   # 重工具链外挂引导（后台、幂等；Android SDK + Flutter 装到 /opt/tools 卷，日志 /tmp/bootstrap-tools.log）
   nohup /usr/local/bin/bootstrap-tools.sh >/dev/null 2>&1 &
   # SSH 调试入口：注入公钥并拉起 sshd（仅密钥登录，密码已禁）

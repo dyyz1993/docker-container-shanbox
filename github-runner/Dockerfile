@@ -118,7 +118,8 @@ ENV GOPROXY=https://goproxy.cn,direct \
 
 USER root
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY proxy-setup.sh /usr/local/bin/proxy-setup.sh
 COPY bootstrap-tools.sh /usr/local/bin/bootstrap-tools.sh
-RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/bootstrap-tools.sh
+RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/bootstrap-tools.sh /usr/local/bin/proxy-setup.sh
 WORKDIR ${RUNNER_HOME}
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
