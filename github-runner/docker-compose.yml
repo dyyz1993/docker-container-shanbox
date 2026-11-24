@@ -11,7 +11,8 @@ services:
     init: true
     tmpfs:
       - /var/run # 每次启动给干净的运行目录：避免残留 docker.pid 导致 dockerd 拒启
-    entrypoint: ["sh","-c","mkdir -p /run/sshd && exec /usr/local/bin/entrypoint.sh"]
+    # 用 bash 显式执行：下方只读挂载会带宿主文件的 mode（可能没有 +x），不能依赖 exec 权限位。
+    entrypoint: ["sh","-c","mkdir -p /run/sshd && exec bash /usr/local/bin/entrypoint.sh"]
     ports:
       - "${SSH_PORT:-2202}:22" # SSH 调试入口（仅密钥）
     env_file:
