@@ -59,7 +59,7 @@ jobs:
       # 构建成功 ≠ 修复进了镜像：2026-11-05 entrypoint 修复因上一步构建失败从未进入 ghcr，
       # NAS 上跑的仍是 10-29 旧镜像（相对路径 rm 删不到 actions-runner/.runner → "already configured" 崩溃循环）。
       # 这里用刚推上去的镜像做一次最小冒烟：entrypoint 必须用绝对路径清理 .runner/.credentials*。
-      - name: Smoke: image entrypoint cleans absolute runner paths
+      - name: "Smoke: image entrypoint cleans absolute runner paths"
         run: |
           docker pull "$REGISTRY/$IMAGE_NAME:latest"
           docker run --rm --entrypoint sh "$REGISTRY/$IMAGE_NAME:latest" -c '
