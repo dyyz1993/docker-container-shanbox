@@ -106,7 +106,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssh-server 
 # ---------- 国内镜像源（NAS 上跑 CI job 时生效；对 GitHub 构建机无影响）----------
 # npm/pnpm：全局 .npmrc 指向 npmmirror——lockfile 已锁 resolved URL 的仍走原源（一致性不受影响），
 # 未锁的包、npm 全局包、pnpm store 走镜像
-RUN mkdir -p /home/runner/.config && \
+RUN mkdir -p /home/runner/.config/npm && \
     printf 'registry=https://registry.npmmirror.com\n' > /home/runner/.npmrc && \
     printf 'registry=https://registry.npmmirror.com\n' > /home/runner/.config/npm/rc && \
     chown -R runner:runner /home/runner/.npmrc /home/runner/.config

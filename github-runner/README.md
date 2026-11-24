@@ -81,6 +81,11 @@ docker compose -p <项目名> --env-file .env.<名字> up -d --force-recreate
   workflow 每月 1 号自动构建新镜像；⚠️ 若仓库里的 docker-compose.yml 也有更新，先重新 curl 覆盖 NAS 上的 compose 再跑脚本。
 - **--ephemeral**：一个 runner 只接一个 job，跑完自动注销、容器重启重新注册（`--replace` 清理同名旧注册）。
   NAS 断电重启后自动恢复，无需人工干预。
+- **entrypoint 热修的正确姿势**（2026-11-24 事故复盘）：`entrypoint.sh` 的真相源是本目录 + Dockerfile `COPY` 进镜像；
+  compose 同时把 `./entrypoint.sh` 只读挂到 `/usr/local/bin/entrypoint.sh`，所以 NAS 上**先同步本目录的文件**再 `compose up -d` 即生效，
+  不必等镜像重建。镜像内旧版 entrypoint（10-29）用相对路径 `rm -rf _work .credentials .runner` 且 cwd 在 `/home/runner`，
+  删不到 `actions-runner/.runner`，ephemeral 跑完一个 job 后重启必报 "Cannot configure the runner because it is already configured" 并崩溃循环。
+  构建工作流末尾有冒烟步骤断言新镜像的 entrypoint 含绝对路径清理行，防止修复"构建成功但没进镜像"再次静默发生。
 - **磁盘**：镜像 ~3GB（工具链已外挂到 gha-tools 卷，~3GB）；`dind-data` 卷随 CI 构建增长（镜像缓存保留以加速），
   必要时 `docker exec gha-runner-1 docker system prune -af` 清理。
 - **国内镜像源已内置**：GOPROXY/flutter-io.cn/npmmirror(playwright+node 分发)/npm registry 全局 .npmrc

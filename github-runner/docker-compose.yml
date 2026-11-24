@@ -9,6 +9,9 @@ services:
     restart: unless-stopped
     privileged: true # 内嵌 dockerd（dind）需要；与 NAS 宿主 Docker 完全隔离
     init: true
+    tmpfs:
+      - /var/run # 每次启动给干净的运行目录：避免残留 docker.pid 导致 dockerd 拒启
+    entrypoint: ["sh","-c","mkdir -p /run/sshd && exec /usr/local/bin/entrypoint.sh"]
     ports:
       - "${SSH_PORT:-2202}:22" # SSH 调试入口（仅密钥）
     env_file:
@@ -26,6 +29,9 @@ services:
       - /data/docker/cache/chromium:/opt/nas-chrome:ro # 复用 NAS 现成 Chrome（CI 里可用 channel:"chrome"/executablePath 直取）
       - pnpm-store:/home/runner/.local/share/pnpm # pnpm 包存储跨 job 复用
       - tools:/opt/tools # 外挂卷：Android SDK + Flutter 懒加载，跨镜像更新存活（两实例共享一份）
+      # entrypoint 只读挂载：宿主改 entrypoint 后 `compose up -d` 即生效，不必等镜像重建。
+      # 镜像内仍是同一份（Dockerfile COPY），这里只是让热修路径与镜像真相源保持同一文件。
+      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     # 不映射任何端口：runner 是出站长轮询连 GitHub，NAS 在内网即可
 
 volumes:
